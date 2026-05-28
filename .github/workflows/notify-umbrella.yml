@@ -1,0 +1,17 @@
+name: Notify umbrella
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger submodule bump in personal-apps
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.SUBMODULE_PAT }}
+          repository: guilhermomg/personal-apps
+          event-type: submodule-updated
+          client-payload: '{"package": "finances"}'
