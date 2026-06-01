@@ -1,3 +1,7 @@
 node_modules/
 *.tsbuildinfo
 .DS_Store
+
+# Secrets & local tooling — never publish
+.env*
+.claude/
