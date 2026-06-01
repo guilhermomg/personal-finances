@@ -48,6 +48,7 @@ export function RecurringEditModal({
     amount: String(initAmount),
     payment_method: initMethod,
     day_of_month: initDayOfMonth != null ? String(initDayOfMonth) : '',
+    date: transaction?.date ?? '',
   })
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function RecurringEditModal({
           category: form.category,
           amount,
           payment_method: form.payment_method,
-          date: transaction.date,
+          date: form.date || transaction.date,
           notes: transaction.notes,
           statement_date: transaction.statement_date,
         })
@@ -187,7 +188,7 @@ export function RecurringEditModal({
             margin: '0 28px 20px',
           }}>
             <button style={scope === 'next' ? tabActive : tabBase} onClick={() => setScope('next')}>
-              Next occurrence only
+              This occurrence only
             </button>
             <button style={scope === 'all-future' ? tabActive : tabBase} onClick={() => setScope('all-future')}>
               This and all future
@@ -256,18 +257,30 @@ export function RecurringEditModal({
                   {allMethods.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={labelStyle}>Day of Month</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  style={inputStyle}
-                  value={form.day_of_month}
-                  onChange={set('day_of_month')}
-                  placeholder="e.g. 17"
-                />
-              </div>
+              {scope === 'next' ? (
+                <div>
+                  <label style={labelStyle}>Date</label>
+                  <input
+                    type="date"
+                    style={inputStyle}
+                    value={form.date}
+                    onChange={set('date')}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label style={labelStyle}>Day of Month</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    style={inputStyle}
+                    value={form.day_of_month}
+                    onChange={set('day_of_month')}
+                    placeholder="e.g. 17"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
