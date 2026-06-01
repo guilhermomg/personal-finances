@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { TransactionTable } from './TransactionTable'
 import { RecurringEditModal } from './transactions/RecurringEditModal'
-import type { TransactionRow, PaymentMethodConfig } from '../types/finance'
+import type { TransactionRow, PaymentMethodConfig, PaymentStyleMap } from '../types/finance'
 
 type Props = {
   rows: TransactionRow[]
@@ -12,9 +12,10 @@ type Props = {
   allCategories: string[]
   allMethods: string[]
   paymentMethodConfigs: PaymentMethodConfig[]
+  paymentStyles: PaymentStyleMap
 }
 
-export function RecurringTableWithEdit({ rows, total, totalSpent, allCategories, allMethods, paymentMethodConfigs }: Props) {
+export function RecurringTableWithEdit({ rows, total, totalSpent, allCategories, allMethods, paymentMethodConfigs, paymentStyles }: Props) {
   const [editingRow, setEditingRow] = useState<TransactionRow | null>(null)
 
   return (
@@ -25,6 +26,7 @@ export function RecurringTableWithEdit({ rows, total, totalSpent, allCategories,
         rows={rows}
         total={total}
         totalSpent={totalSpent}
+        paymentStyles={paymentStyles}
         onRowClick={setEditingRow}
       />
       {editingRow?.recurring_transaction_id != null && (

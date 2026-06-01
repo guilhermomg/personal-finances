@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Chip } from '../Chip'
-import { chipVariantFromPm, chipVariantFromProvider } from '../chipUtils'
+import { chipProps } from '../chipUtils'
 import { formatCurrency } from '../../lib/format'
 import { MultiSelect } from './MultiSelect'
 import { DateBillingFilterDropdown } from './DateBillingFilterDropdown'
@@ -11,7 +11,7 @@ import { type FilterMode } from './DateBillingFilter'
 import { TransactionModal } from './TransactionModal'
 import { RecurringEditModal } from './RecurringEditModal'
 import { FAB } from '../FAB'
-import type { Transaction, PaymentMethodConfig, BillingPeriodOption } from '../../types/finance'
+import type { Transaction, PaymentMethodConfig, BillingPeriodOption, PaymentStyleMap } from '../../types/finance'
 
 type SortKey = 'date' | 'description' | 'category' | 'amount'
 type SortDir = 'asc' | 'desc'
@@ -24,7 +24,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   amount: 'Amount',
 }
 
-export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, paymentMethodConfigs, allCategories }: {
+export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, paymentMethodConfigs, allCategories, paymentStyles }: {
   transactions: Transaction[]
   billingPeriods: BillingPeriodOption[]
   initialPeriodId: number | null
@@ -32,6 +32,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
   initialDateTo?: string
   paymentMethodConfigs: PaymentMethodConfig[]
   allCategories: string[]
+  paymentStyles: PaymentStyleMap
 }) {
   const searchParams = useSearchParams()
   const [sortKey, setSortKey] = useState<SortKey>('date')
@@ -298,11 +299,11 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                     {formatCurrency((t.transaction_type === 'expense' ? 1 : -1) * Number(t.amount))}
                   </td>
                   <td style={{ whiteSpace: 'nowrap', paddingLeft: '12px' }}>
-                    <Chip variant={chipVariantFromPm(t.payment_method)} />
+                    <Chip {...chipProps(paymentStyles, t.payment_method)} />
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {t.payment_provider && (
-                      <Chip variant={chipVariantFromProvider(t.payment_provider)} label={t.payment_provider} />
+                      <Chip {...chipProps(paymentStyles, t.payment_provider)} />
                     )}
                   </td>
                   <td>
@@ -377,9 +378,9 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
-                    <Chip variant={chipVariantFromPm(t.payment_method)} />
+                    <Chip {...chipProps(paymentStyles, t.payment_method)} />
                     {t.payment_provider && (
-                      <Chip variant={chipVariantFromProvider(t.payment_provider)} label={t.payment_provider} />
+                      <Chip {...chipProps(paymentStyles, t.payment_provider)} />
                     )}
                     {t.transaction_type !== 'expense' && (
                       <span style={{

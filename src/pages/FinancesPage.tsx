@@ -1,4 +1,4 @@
-import { getDashboardData, getPaymentMethodConfigs, getCategories, getProviders } from '../lib/finance'
+import { getDashboardData, getPaymentMethodConfigs, getCategories, getProviders, getPaymentMethodStyles } from '../lib/finance'
 import { SpendingCard } from '../components/SpendingCard'
 import { CardSummary } from '../components/CardSummary'
 import { TransactionTable } from '../components/TransactionTable'
@@ -15,11 +15,12 @@ export default async function FinancesPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { month } = await searchParams
-  const [data, paymentMethodConfigs, allCategories, allProviders] = await Promise.all([
+  const [data, paymentMethodConfigs, allCategories, allProviders, paymentStyles] = await Promise.all([
     getDashboardData(month as string | undefined),
     getPaymentMethodConfigs(),
     getCategories(),
     getProviders(),
+    getPaymentMethodStyles(),
   ])
 
   if (!data) {
@@ -91,6 +92,7 @@ export default async function FinancesPage({
           allCategories={allCategories}
           allMethods={data.cards.map(c => c.name)}
           paymentMethodConfigs={paymentMethodConfigs}
+          paymentStyles={paymentStyles}
         />
         <TransactionTable
           title="Installments"
@@ -99,6 +101,7 @@ export default async function FinancesPage({
           total={data.installTotal}
           totalSpent={data.totalCeiling}
           totalColor="var(--accent2)"
+          paymentStyles={paymentStyles}
         />
       </div>
 

@@ -1,7 +1,7 @@
 import { formatCurrency, formatPct } from '../lib/format'
 import { Chip } from './Chip'
-import { chipVariantFromPm, chipVariantFromProvider } from './chipUtils'
-import type { TransactionRow } from '../types/finance'
+import { chipProps } from './chipUtils'
+import type { TransactionRow, PaymentStyleMap } from '../types/finance'
 
 const creditBadgeStyle: React.CSSProperties = {
   display: 'inline-block',
@@ -34,10 +34,11 @@ type Props = {
   total: number
   totalSpent: number
   totalColor?: string
+  paymentStyles: PaymentStyleMap
   onRowClick?: (row: TransactionRow) => void
 }
 
-export function TransactionTable({ title, dotColor, rows, total, totalSpent, totalColor, onRowClick }: Props) {
+export function TransactionTable({ title, dotColor, rows, total, totalSpent, totalColor, paymentStyles, onRowClick }: Props) {
   const todayStr = new Date().toISOString().split('T')[0]
 
   return (
@@ -65,10 +66,10 @@ export function TransactionTable({ title, dotColor, rows, total, totalSpent, tot
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
               <td>
-                <Chip variant={chipVariantFromPm(row.payment_method)} />
+                <Chip {...chipProps(paymentStyles, row.payment_method)} />
                 {row.payment_provider && (
                   <span style={{ marginLeft: '4px' }}>
-                    <Chip variant={chipVariantFromProvider(row.payment_provider)} label={row.payment_provider} />
+                    <Chip {...chipProps(paymentStyles, row.payment_provider)} />
                   </span>
                 )}
                 <span style={{ marginLeft: '6px' }}>
@@ -117,10 +118,10 @@ export function TransactionTable({ title, dotColor, rows, total, totalSpent, tot
             >
               <div className="tx-list-top">
                 <div className="tx-list-left">
-                  <Chip variant={chipVariantFromPm(row.payment_method)} />
+                  <Chip {...chipProps(paymentStyles, row.payment_method)} />
                   {row.payment_provider && (
                     <span style={{ marginLeft: '4px' }}>
-                      <Chip variant="ws" label={row.payment_provider} />
+                      <Chip {...chipProps(paymentStyles, row.payment_provider)} />
                     </span>
                   )}
                   <span className="tx-list-desc">

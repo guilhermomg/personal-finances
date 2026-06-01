@@ -1,17 +1,13 @@
-import type { ChipVariant } from '../types/finance'
+import type { PaymentStyleMap } from '../types/finance'
 
-export function chipVariantFromPm(pm: string): ChipVariant {
-  const p = pm.toLowerCase()
-  if (p.includes('amex')) return 'amex'
-  if (p.includes('wealthsimple') && p.includes('visa')) return 'ws-visa'
-  if (p.includes('td') || p.includes('visa')) return 'td'
-  return 'ws'
-}
-
-export function chipVariantFromProvider(provider: string): ChipVariant {
-  const p = provider.toLowerCase()
-  if (p.includes('paypal')) return 'paypal'
-  if (p.includes('klarna')) return 'klarna'
-  if (p.includes('affirm')) return 'affirm'
-  return 'ws'
+// Resolves <Chip> props for a payment method / provider name from the DB-driven
+// style map. Falls back to the raw name + default color when a name is unmapped.
+export function chipProps(styles: PaymentStyleMap, name: string | null | undefined) {
+  if (!name) return { label: '', colorMain: null, colorSecondary: null }
+  const s = styles[name]
+  return {
+    label: s?.label ?? name,
+    colorMain: s?.colorMain ?? null,
+    colorSecondary: s?.colorSecondary ?? null,
+  }
 }

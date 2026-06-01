@@ -1,6 +1,6 @@
 import { createFinancesAdminClient } from './supabase/admin'
 import { getOrCreatePeriod } from './billing'
-import type { Transaction, DashboardData, CardData, ChipVariant, BillingPeriod, BillingPeriodOption, CumulativePoint, PaymentMethodConfig } from '../types/finance'
+import type { Transaction, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, PaymentMethodConfig } from '../types/finance'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -8,32 +8,9 @@ function txSign(type: string): 1 | -1 {
   return type === 'expense' ? 1 : -1
 }
 
-function chipVariant(pm: string): ChipVariant {
-  const p = pm.toLowerCase()
-  if (p.includes('amex')) return 'amex'
-  if (p.includes('wealthsimple') && p.includes('visa')) return 'ws-visa'
-  if (p.includes('td') || p.includes('visa')) return 'td'
-  return 'ws'
-}
-
-function shortName(pm: string): string {
-  if (pm.toLowerCase().includes('amex')) return 'Amex'
-  if (pm.toLowerCase().includes('td')) return 'TD'
-  return pm.split(' ')[0]
-}
-
 function formatCloseDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function formatCycleLabel(name: string, start: Date, end: Date): string {
-  const sm = start.toLocaleDateString('en-US', { month: 'short' })
-  const em = end.toLocaleDateString('en-US', { month: 'short' })
-  const sd = start.getDate()
-  const ed = end.getDate()
-  const range = sm === em ? `${sm} ${sd}–${ed}` : `${sm} ${sd}–${em} ${ed}`
-  return `${shortName(name)} ${range}`
 }
 
 // ── billing periods ───────────────────────────────────────────────────────────
@@ -159,12 +136,8 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     const cycleTxs = txs.filter(t => t.billing_cycle_id === cycle.id)
     const projected = cycleTxs.reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
     const spent = cycleTxs.filter(t => t.date <= todayStr).reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
-    const start = new Date(cycle.start_date + 'T00:00:00')
-    const end = new Date(cycle.end_date + 'T00:00:00')
     return {
       name: payment_method,
-      chipVariant: chipVariant(payment_method),
-      cycleLabel: formatCycleLabel(payment_method, start, end),
       spent,
       projected,
       closeDate: formatCloseDate(cycle.end_date),
@@ -385,6 +358,20 @@ export async function getProviders(): Promise<string[]> {
     .not('payment_provider', 'is', null)
   const providers = [...new Set((data ?? []).map((r: any) => r.payment_provider as string))].sort()
   return providers
+}
+
+// Chip styling for payment methods / providers, keyed by name. Loaded server-side
+// and passed to the components that render chips.
+export async function getPaymentMethodStyles(): Promise<PaymentStyleMap> {
+  const db = createFinancesAdminClient()
+  const { data } = await db
+    .from('payment_method_styles')
+    .select('name, label, color_main, color_secondary')
+  const map: PaymentStyleMap = {}
+  for (const r of (data ?? []) as any[]) {
+    map[r.name] = { label: r.label, colorMain: r.color_main, colorSecondary: r.color_secondary }
+  }
+  return map
 }
 
 export async function getBillingPeriods(): Promise<BillingPeriodOption[]> {

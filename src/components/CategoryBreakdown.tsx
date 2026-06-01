@@ -43,7 +43,7 @@ export function CategoryBreakdown({ categories, totalCeiling, categoryBudgets, b
   return (
     <div className="card">
       <div className="section-title">
-        <span className="dot" style={{ background: 'var(--amex)' }} />
+        <span className="dot" style={{ background: 'var(--accent)' }} />
         Spending by Category
       </div>
       {categories.map(({ name, amount }) => {

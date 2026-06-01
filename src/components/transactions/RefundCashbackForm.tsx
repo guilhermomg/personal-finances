@@ -151,7 +151,7 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, paymentMeth
           style={inputStyle}
           value={form.description}
           onChange={set('description')}
-          placeholder={type === 'cashback' ? 'e.g. Amex cashback reward' : 'e.g. Return – Zara jacket'}
+          placeholder={type === 'cashback' ? 'e.g. card cashback reward' : 'e.g. Return – jacket'}
         />
       </div>
 

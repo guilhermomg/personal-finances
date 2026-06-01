@@ -20,7 +20,13 @@ export type Transaction = {
   refund_for_transaction_id: number | null
 }
 
-export type ChipVariant = 'amex' | 'td' | 'ws' | 'ws-visa' | 'paypal' | 'klarna' | 'affirm'
+export type ChipStyle = {
+  label: string | null
+  colorMain: string
+  colorSecondary: string | null
+}
+
+export type PaymentStyleMap = Record<string, ChipStyle>
 
 export type BillingCyclePayment = {
   id: number
@@ -33,8 +39,6 @@ export type BillingCyclePayment = {
 
 export type CardData = {
   name: string
-  chipVariant: ChipVariant
-  cycleLabel: string
   spent: number
   projected: number
   closeDate: string
