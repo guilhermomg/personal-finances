@@ -106,6 +106,7 @@ export type DashboardData = {
   groceriesSpent: number
   groceriesProjected: number
   groceriesCeiling: number
+  budgetCards: { category: string; ceiling: number; spent: number }[]
   categoryBudgets: Record<string, number>
   cards: CardData[]
   recurring: TransactionRow[]

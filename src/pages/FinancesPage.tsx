@@ -8,6 +8,7 @@ import { BillingPeriodSwitcher } from '../components/BillingPeriodSwitcher'
 import { FAB } from '../components/FAB'
 import { CumulativeChart } from '../components/CumulativeChart'
 import { CreditUsageCard } from '../components/CreditUsageCard'
+import { AddBudgetButton } from '../components/AddBudgetButton'
 
 export default async function FinancesPage({
   searchParams,
@@ -51,14 +52,23 @@ export default async function FinancesPage({
       </div>
 
       <div className="page-section">
-        <div className="page-section-title">Budgets</div>
-        <div className="grid grid-3">
-          <SpendingCard
-            label="Groceries"
-            spent={data.groceriesSpent}
-            ceiling={data.groceriesCeiling}
-            editTarget={{ billingPeriodId: data.currentPeriod.id, category: 'Groceries' }}
+        <div className="page-section-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          Budgets
+          <AddBudgetButton
+            billingPeriodId={data.currentPeriod.id}
+            availableCategories={allCategories.filter(c => !(c in data.categoryBudgets))}
           />
+        </div>
+        <div className="grid grid-3">
+          {data.budgetCards.map(b => (
+            <SpendingCard
+              key={b.category}
+              label={b.category}
+              spent={b.spent}
+              ceiling={b.ceiling}
+              editTarget={{ billingPeriodId: data.currentPeriod.id, category: b.category }}
+            />
+          ))}
         </div>
       </div>
 
@@ -111,8 +121,6 @@ export default async function FinancesPage({
       <CategoryBreakdown
         categories={data.categories}
         totalCeiling={data.totalCeiling}
-        categoryBudgets={data.categoryBudgets}
-        billingPeriodId={data.currentPeriod.id}
       />
 
       <FAB

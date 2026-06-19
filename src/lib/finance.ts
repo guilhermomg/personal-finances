@@ -134,6 +134,19 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     .filter(t => t.category === 'Groceries')
     .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
 
+  // ── per-category budget cards ──────────────────────────────────────────────
+  // Spend-to-date per category (mirrors the groceries to-date rule), so every
+  // budgeted category — even one with no spending yet — renders its own card.
+  const categorySpentToDate = txs
+    .filter(t => (periodStarted ? t.date <= todayStr : true))
+    .reduce<Record<string, number>>((acc, t) => {
+      acc[t.category] = (acc[t.category] ?? 0) + txSign(t.transaction_type) * Number(t.amount)
+      return acc
+    }, {})
+  const budgetCards = Object.entries(categoryBudgets)
+    .map(([category, ceiling]) => ({ category, ceiling, spent: categorySpentToDate[category] ?? 0 }))
+    .sort((a, b) => b.ceiling - a.ceiling)
+
   // ── cards ─────────────────────────────────────────────────────────────────
   const cards: CardData[] = cyclesData.map((cycle: any) => {
     const { id: configId, payment_method, credit_limit, account_type } = cycle.config
@@ -275,6 +288,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     groceriesSpent,
     groceriesProjected,
     groceriesCeiling,
+    budgetCards,
     categoryBudgets,
     cards,
     recurring,

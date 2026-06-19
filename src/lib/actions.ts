@@ -39,6 +39,48 @@ export async function upsertBudget(billingPeriodId: number, category: string | n
   }
 }
 
+// Sets a category budget for the given period and every period from that month
+// onward, so the budget carries across all future periods. (Periods created
+// later inherit it via the carry-forward in getOrCreatePeriod.)
+export async function upsertBudgetForward(fromPeriodId: number, category: string, amount: number) {
+  const db = createFinancesAdminClient()
+
+  const { data: from } = await db
+    .from('billing_periods')
+    .select('start_month')
+    .eq('id', fromPeriodId)
+    .maybeSingle()
+  if (!from) throw new Error('Billing period not found')
+
+  const { data: periods } = await db
+    .from('billing_periods')
+    .select('id')
+    .gte('start_month', (from as { start_month: string }).start_month)
+  const periodIds = (periods ?? []).map((p: any) => p.id as number)
+  if (periodIds.length === 0) return
+
+  const { data: existing } = await db
+    .from('budgets')
+    .select('id, billing_period_id')
+    .eq('category', category)
+    .in('billing_period_id', periodIds)
+  const existingRows = (existing ?? []) as { id: number; billing_period_id: number }[]
+  const haveBudget = new Set(existingRows.map(r => r.billing_period_id))
+
+  for (const row of existingRows) {
+    const { error } = await db.from('budgets').update({ amount }).eq('id', row.id)
+    if (error) throw new Error(error.message)
+  }
+
+  const missing = periodIds.filter(id => !haveBudget.has(id))
+  if (missing.length > 0) {
+    const { error } = await db.from('budgets').insert(
+      missing.map(id => ({ billing_period_id: id, category, amount, user_id: ownerUserId() })),
+    )
+    if (error) throw new Error(error.message)
+  }
+}
+
 export async function updateCreditLimit(configId: number, amount: number | null) {
   const db = createFinancesAdminClient()
   const { error } = await db
