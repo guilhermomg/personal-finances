@@ -92,14 +92,14 @@ export function SpendingCard({ label, spent, ceiling, projected, deduction, edit
             <span style={{ color: pctColor }}>{formatPct(spent, ceiling)}</span> used ·{' '}
             {formatCurrency(ceiling - spent)} remaining
           </div>
-          {deduction !== undefined && (
-            <div className="sub-num" style={{ marginTop: 2 }}>
-              {formatCurrency(ceiling - spent - deduction.amount)}{' '}
-              <span style={{ color: 'var(--muted)' }}>{deduction.label}</span>
-            </div>
-          )}
           {projected !== undefined && (
             <div className="projected">→ projected {formatCurrency(projected)}</div>
+          )}
+          {deduction !== undefined && (
+            <div className="sub-num" style={{ marginTop: 2 }}>
+              {formatCurrency(ceiling - (projected ?? spent) - deduction.amount)}{' '}
+              <span style={{ color: 'var(--muted)' }}>{deduction.label}</span>
+            </div>
           )}
           <div style={{ marginTop: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' }}>

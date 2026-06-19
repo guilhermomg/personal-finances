@@ -101,8 +101,10 @@ export type DashboardData = {
   projectedSpent: number
   totalCeiling: number
   discretionarySpent: number
+  discretionaryProjected: number
   discretionaryCeiling: number
   groceriesSpent: number
+  groceriesProjected: number
   groceriesCeiling: number
   categoryBudgets: Record<string, number>
   cards: CardData[]

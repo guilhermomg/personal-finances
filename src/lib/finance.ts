@@ -129,6 +129,10 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   const groceriesSpent = txs
     .filter(t => t.category === 'Groceries' && (periodStarted ? t.date <= todayStr : true))
     .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
+  // Projected groceries — all grocery txs in the period regardless of date.
+  const groceriesProjected = txs
+    .filter(t => t.category === 'Groceries')
+    .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
 
   // ── cards ─────────────────────────────────────────────────────────────────
   const cards: CardData[] = cyclesData.map((cycle: any) => {
@@ -225,6 +229,12 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     .filter(t => t.recurring_transaction_id !== null && (periodStarted ? t.date <= todayStr : true))
     .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
   const discretionarySpent = totalSpent - recurringActualTotal
+  // Projected discretionary — full-period spend (incl. scheduled recurring still to post)
+  // minus all recurring, so it reflects what will actually be left at period end.
+  const recurringProjectedTotal = txs
+    .filter(t => t.recurring_transaction_id !== null)
+    .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
+  const discretionaryProjected = projectedSpent - recurringProjectedTotal
 
   // ── cumulative chart data ─────────────────────────────────────────────────
   const periodStart = cyclesData.reduce(
@@ -260,8 +270,10 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     projectedSpent,
     totalCeiling,
     discretionarySpent,
+    discretionaryProjected,
     discretionaryCeiling,
     groceriesSpent,
+    groceriesProjected,
     groceriesCeiling,
     categoryBudgets,
     cards,

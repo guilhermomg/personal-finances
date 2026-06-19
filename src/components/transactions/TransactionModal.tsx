@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { addTransaction, updateTransaction, addInstallments, addCategory, addBillingCyclePayment } from '../../lib/actions'
+import { addTransaction, updateTransaction, deleteTransaction, addInstallments, addCategory, addBillingCyclePayment } from '../../lib/actions'
 import type { Transaction, PaymentMethodConfig } from '../../types/finance'
 import { OneTimeForm, type OneTimeFormHandle } from './OneTimeForm'
 import { InstallmentsForm, type InstallmentsFormHandle } from './InstallmentsForm'
@@ -26,6 +26,8 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>('onetime')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const isNew = !transaction
 
   const oneTimeRef = useRef<OneTimeFormHandle>(null)
@@ -35,11 +37,13 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape' || deleting) return
+      if (confirmingDelete) setConfirmingDelete(false)
+      else onClose()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [onClose, confirmingDelete, deleting])
 
   async function handleSave() {
     setSaving(true)
@@ -77,6 +81,21 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save')
       setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!transaction) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteTransaction(transaction.id)
+      router.refresh()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete')
+      setDeleting(false)
+      setConfirmingDelete(false)
     }
   }
 
@@ -202,7 +221,24 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
           {error && (
             <p style={{ marginBottom: '12px', fontSize: '11px', color: 'var(--danger)' }}>{error}</p>
           )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: !isNew ? 'space-between' : 'flex-end', alignItems: 'center', gap: '8px' }}>
+            {!isNew && (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  color: 'var(--danger)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  padding: '8px 16px',
+                }}
+              >
+                Delete
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={onClose}
               style={{
@@ -234,9 +270,78 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
             >
               {saving ? 'Saving…' : !isNew ? 'Save' : mode === 'installments' ? 'Add Installments' : mode === 'refund' ? 'Add Credit' : mode === 'payment' ? 'Add Payment' : 'Add'}
             </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      {confirmingDelete && (
+        <div
+          onClick={e => { e.stopPropagation(); if (!deleting) setConfirmingDelete(false) }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 110,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '360px',
+              padding: '28px',
+            }}
+          >
+            <span style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: '16px' }}>
+              Delete transaction?
+            </span>
+            <p style={{ margin: '12px 0 20px', fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 }}>
+              {transaction?.description ? `“${transaction.description}” will be permanently removed. ` : ''}
+              This can&rsquo;t be undone.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  color: 'var(--muted)',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  padding: '8px 16px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  background: 'var(--danger)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  opacity: deleting ? 0.6 : 1,
+                  padding: '8px 20px',
+                }}
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

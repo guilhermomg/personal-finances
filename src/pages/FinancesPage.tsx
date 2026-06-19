@@ -45,7 +45,8 @@ export default async function FinancesPage({
           label="Discretionary"
           spent={data.discretionarySpent}
           ceiling={data.discretionaryCeiling}
-          deduction={{ amount: data.groceriesCeiling - data.groceriesSpent, label: 'after groceries' }}
+          projected={data.discretionaryProjected}
+          deduction={{ amount: Math.max(0, data.groceriesCeiling - data.groceriesProjected), label: 'after groceries' }}
         />
       </div>
 

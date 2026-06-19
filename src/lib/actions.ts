@@ -168,3 +168,12 @@ export async function updateTransaction(id: number, data: TransactionData) {
     .eq('id', id)
   if (error) throw new Error(error.message)
 }
+
+export async function deleteTransaction(id: number) {
+  const db = createFinancesAdminClient()
+  const { error } = await db
+    .from('transactions')
+    .delete()
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
