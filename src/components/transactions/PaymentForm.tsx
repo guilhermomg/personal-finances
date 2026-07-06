@@ -2,6 +2,7 @@
 
 import { useImperativeHandle, useState } from 'react'
 import { inputStyle, labelStyle } from './transaction-utils'
+import { AmountInput } from './AmountInput'
 
 export type PaymentCard = { name: string; cycleId: number }
 
@@ -27,7 +28,7 @@ export function PaymentForm({ ref, creditCards }: Props) {
 
   const [form, setForm] = useState({
     cycleId: initCard?.cycleId ?? 0,
-    amount: '',
+    amount: '0.00',
     paymentDate: todayStr,
     notes: '',
   })
@@ -79,15 +80,7 @@ export function PaymentForm({ ref, creditCards }: Props) {
 
       <div>
         <label style={labelStyle}>Amount</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          style={inputStyle}
-          value={form.amount}
-          onChange={set('amount')}
-          placeholder="0.00"
-        />
+        <AmountInput value={form.amount} onValueChange={v => setForm(prev => ({ ...prev, amount: v }))} />
       </div>
 
       <div>

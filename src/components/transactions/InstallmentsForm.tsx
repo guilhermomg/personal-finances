@@ -3,6 +3,7 @@
 import { useEffect, useImperativeHandle, useState } from 'react'
 import type { PaymentMethodConfig } from '../../types/finance'
 import { inputStyle, labelStyle } from './transaction-utils'
+import { AmountInput } from './AmountInput'
 
 export type InstallmentItem = {
   description: string
@@ -29,7 +30,7 @@ function computeSchedule(
   periodicity: Periodicity,
   totalAmount: number
 ): ScheduleRow[] {
-  if (n < 1 || !isFinite(totalAmount) || totalAmount <= 0 || !firstDate) return []
+  if (!Number.isFinite(n) || n < 1 || !isFinite(totalAmount) || totalAmount <= 0 || !firstDate) return []
 
   const base = Math.floor((totalAmount / n) * 100) / 100
   const amounts: number[] = Array(n).fill(base)
@@ -45,7 +46,7 @@ function computeSchedule(
     dates.push(prev.toISOString().split('T')[0])
   }
 
-  return dates.map((date, i) => ({ date, amount: String(amounts[i]) }))
+  return dates.map((date, i) => ({ date, amount: amounts[i].toFixed(2) }))
 }
 
 type Props = {
@@ -62,7 +63,7 @@ export function InstallmentsForm({ ref, allCategories, allMethods, allProviders 
   const [form, setForm] = useState({
     description: '',
     category: allCategories[0] ?? '',
-    totalAmount: '',
+    totalAmount: '0.00',
     payment_method: allMethods[0] ?? '',
     payment_provider: '',
     numInstallments: '3',
@@ -193,7 +194,7 @@ export function InstallmentsForm({ ref, allCategories, allMethods, allProviders 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ flex: '1 1 140px', minWidth: 0 }}>
           <label style={labelStyle}>Total Amount</label>
-          <input type="number" step="0.01" min="0" style={inputStyle} value={form.totalAmount} onChange={set('totalAmount')} />
+          <AmountInput value={form.totalAmount} onValueChange={v => setForm(prev => ({ ...prev, totalAmount: v }))} />
         </div>
         <div style={{ flex: '1 1 140px', minWidth: 0 }}>
           <label style={labelStyle}>Installments</label>
@@ -246,13 +247,10 @@ export function InstallmentsForm({ ref, allCategories, allMethods, allProviders 
                     value={row.date}
                     onChange={e => updateRow(i, 'date', e.target.value)}
                   />
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <AmountInput
                     style={{ ...inputStyle, padding: '4px 8px' }}
                     value={row.amount}
-                    onChange={e => updateRow(i, 'amount', e.target.value)}
+                    onValueChange={v => updateRow(i, 'amount', v)}
                   />
                 </div>
               ))}

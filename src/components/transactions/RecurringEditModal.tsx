@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { updateTransaction, updateRecurringTransaction, addCategory, deactivateRecurringTransaction } from '../../lib/actions'
 import type { Transaction, PaymentMethodConfig } from '../../types/finance'
 import { inputStyle, labelStyle } from './transaction-utils'
+import { AmountInput, toAmountString } from './AmountInput'
 import { ConfirmModal } from '../ConfirmModal'
 
 type Scope = 'next' | 'all-future'
@@ -45,7 +46,7 @@ export function RecurringEditModal({
   const [form, setForm] = useState({
     description: initDescription,
     category: initCategory,
-    amount: String(initAmount),
+    amount: toAmountString(initAmount),
     payment_method: initMethod,
     day_of_month: initDayOfMonth != null ? String(initDayOfMonth) : '',
     date: transaction?.date ?? '',
@@ -206,7 +207,7 @@ export function RecurringEditModal({
 
             <div>
               <label style={labelStyle}>Amount</label>
-              <input type="number" step="0.01" min="0" style={inputStyle} value={form.amount} onChange={set('amount')} />
+              <AmountInput value={form.amount} onValueChange={v => setForm(prev => ({ ...prev, amount: v }))} />
             </div>
 
             <div>

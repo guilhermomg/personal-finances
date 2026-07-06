@@ -9,6 +9,7 @@ import {
   inputStyle,
   labelStyle,
 } from './transaction-utils'
+import { AmountInput } from './AmountInput'
 
 export type RefundCashbackFormData = {
   description: string
@@ -44,7 +45,7 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, paymentMeth
     date: todayStr,
     category: allCategories[0] ?? '',
     payment_method: initPm,
-    amount: '',
+    amount: '0.00',
     notes: '',
     statement_date: isCreditCard(initPm, paymentMethodConfigs)
       ? getDefaultStatementDate(todayStr, initPm, paymentMethodConfigs)
@@ -162,7 +163,7 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, paymentMeth
 
       <div>
         <label style={labelStyle}>Amount</label>
-        <input type="number" step="0.01" min="0" style={inputStyle} value={form.amount} onChange={set('amount')} />
+        <AmountInput value={form.amount} onValueChange={v => setForm(prev => ({ ...prev, amount: v }))} />
       </div>
 
       {/* Category — free choice for refunds, locked to Cashback for cashbacks */}

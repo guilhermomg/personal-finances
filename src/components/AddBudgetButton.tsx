@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { upsertBudgetForward } from '../lib/actions'
 import { inputStyle, labelStyle } from './transactions/transaction-utils'
+import { AmountInput } from './transactions/AmountInput'
 
 type Props = {
   billingPeriodId: number
@@ -15,7 +16,7 @@ export function AddBudgetButton({ billingPeriodId, availableCategories }: Props)
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState('')
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState('0.00')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,7 +32,7 @@ export function AddBudgetButton({ billingPeriodId, availableCategories }: Props)
   function close() {
     setOpen(false)
     setCategory('')
-    setAmount('')
+    setAmount('0.00')
     setError(null)
   }
 
@@ -135,16 +136,10 @@ export function AddBudgetButton({ billingPeriodId, availableCategories }: Props)
 
                 <div>
                   <label style={labelStyle}>Monthly Budget</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    inputMode="decimal"
-                    style={inputStyle}
+                  <AmountInput
                     value={amount}
-                    onChange={e => setAmount(e.target.value)}
+                    onValueChange={setAmount}
                     onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-                    placeholder="0.00"
                   />
                 </div>
 

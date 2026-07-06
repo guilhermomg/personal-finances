@@ -9,6 +9,7 @@ import {
   inputStyle,
   labelStyle,
 } from './transaction-utils'
+import { AmountInput, toAmountString } from './AmountInput'
 
 export type OneTimeFormData = {
   description: string
@@ -48,7 +49,7 @@ export function OneTimeForm({ ref, allCategories, allMethods, paymentMethodConfi
     date: initDate,
     category: initialData?.category ?? allCategories[0] ?? '',
     payment_method: initPm,
-    amount: initialData ? String(initialData.amount) : '',
+    amount: toAmountString(initialData?.amount),
     notes: initialData?.notes ?? '',
     statement_date: initStatementDate(),
   })
@@ -112,7 +113,7 @@ export function OneTimeForm({ ref, allCategories, allMethods, paymentMethodConfi
 
       <div>
         <label style={labelStyle}>Amount</label>
-        <input type="number" step="0.01" min="0" style={inputStyle} value={form.amount} onChange={set('amount')} />
+        <AmountInput value={form.amount} onValueChange={v => setForm(prev => ({ ...prev, amount: v }))} />
       </div>
 
       <div>
