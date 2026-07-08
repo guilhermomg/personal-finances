@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { getTransactions, getCurrentPeriodRange, getBillingPeriods, getPaymentMethodConfigs, getCategories, getPaymentMethodStyles } from '../lib/finance'
+import { getTransactions, getBillingPeriods, getPaymentMethodConfigs, getCategories, getPaymentMethodStyles } from '../lib/finance'
 import { TransactionsClient } from '../components/transactions/TransactionsClient'
 
 export default async function TransactionsPage({
@@ -17,19 +17,28 @@ export default async function TransactionsPage({
     getPaymentMethodStyles(),
   ])
 
-  // If ?month= is present, pre-select that billing period (billing-period mode).
-  const initialPeriodId = month
-    ? (billingPeriods.find(p => p.start_month.startsWith(month as string))?.id ?? null)
-    : null
+  const hasMonth = typeof month === 'string' && month.length > 0
+  const hasDates = (typeof from === 'string' && from.length > 0) || (typeof to === 'string' && to.length > 0)
+  // Whether the URL explicitly set the When-filter — the client honours this over
+  // any persisted session filter (e.g. arriving from the dashboard or a card link).
+  const whenFromUrl = hasMonth || hasDates
 
-  // If ?from=/?to= are present, use them as the initial date range (date-range mode).
-  // If neither month nor dates, fall back to the current period's date range.
-  let dateFrom = from as string | undefined
-  let dateTo   = to   as string | undefined
-  if (!initialPeriodId && !dateFrom && !dateTo) {
-    const periodRange = await getCurrentPeriodRange()
-    dateFrom = periodRange?.dateFrom
-    dateTo   = periodRange?.dateTo
+  const dateFrom = typeof from === 'string' ? from : undefined
+  const dateTo   = typeof to   === 'string' ? to   : undefined
+
+  // Billing-period mode when ?month= is present, or — the default — when no When
+  // params are given at all, so the list opens on the same billing period the
+  // dashboard shows rather than an ad-hoc date range.
+  let initialPeriodId: number | null = null
+  if (hasMonth) {
+    initialPeriodId = billingPeriods.find(p => p.start_month.startsWith(month as string))?.id ?? null
+  } else if (!hasDates) {
+    // Most recent period that has already started (periods are ordered newest-first),
+    // falling back to the earliest if none have started yet — mirrors the dashboard.
+    const todayMonth = new Date().toISOString().slice(0, 7)
+    const current = billingPeriods.find(p => p.start_month.slice(0, 7) <= todayMonth)
+      ?? billingPeriods[billingPeriods.length - 1]
+    initialPeriodId = current?.id ?? null
   }
 
   return (
@@ -40,6 +49,7 @@ export default async function TransactionsPage({
         initialPeriodId={initialPeriodId}
         initialDateFrom={dateFrom}
         initialDateTo={dateTo}
+        initialWhenFromUrl={whenFromUrl}
         paymentMethodConfigs={paymentMethodConfigs}
         allCategories={allCategories}
         paymentStyles={paymentStyles}
