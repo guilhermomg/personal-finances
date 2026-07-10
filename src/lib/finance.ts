@@ -143,8 +143,19 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
       acc[t.category] = (acc[t.category] ?? 0) + txSign(t.transaction_type) * Number(t.amount)
       return acc
     }, {})
+  // Projected per category — all txs in the period regardless of date, mirroring
+  // the projected figure on the Total Expenses / card summaries.
+  const categoryProjected = txs.reduce<Record<string, number>>((acc, t) => {
+    acc[t.category] = (acc[t.category] ?? 0) + txSign(t.transaction_type) * Number(t.amount)
+    return acc
+  }, {})
   const budgetCards = Object.entries(categoryBudgets)
-    .map(([category, ceiling]) => ({ category, ceiling, spent: categorySpentToDate[category] ?? 0 }))
+    .map(([category, ceiling]) => ({
+      category,
+      ceiling,
+      spent: categorySpentToDate[category] ?? 0,
+      projected: categoryProjected[category] ?? 0,
+    }))
     .sort((a, b) => b.ceiling - a.ceiling)
 
   // ── cards ─────────────────────────────────────────────────────────────────

@@ -47,7 +47,11 @@ export default async function FinancesPage({
           spent={data.discretionarySpent}
           ceiling={data.discretionaryCeiling}
           projected={data.discretionaryProjected}
-          deduction={{ amount: Math.max(0, data.groceriesCeiling - data.groceriesProjected), label: 'after groceries' }}
+          deduction={{
+            // Reserve the still-unspent headroom of every category budget, not just groceries.
+            amount: data.budgetCards.reduce((s, b) => s + Math.max(0, b.ceiling - b.projected), 0),
+            label: 'after budgets',
+          }}
         />
       </div>
 
@@ -66,7 +70,9 @@ export default async function FinancesPage({
               label={b.category}
               spent={b.spent}
               ceiling={b.ceiling}
+              projected={Math.abs(b.projected - b.spent) > 0.005 ? b.projected : undefined}
               editTarget={{ billingPeriodId: data.currentPeriod.id, category: b.category }}
+              href={`/finances/transactions?category=${encodeURIComponent(b.category)}&month=${data.currentPeriod.start_month.slice(0, 7)}`}
             />
           ))}
         </div>

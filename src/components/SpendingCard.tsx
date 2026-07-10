@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { upsertBudget } from '../lib/actions'
@@ -18,9 +19,11 @@ type Props = {
   projected?: number
   deduction?: { amount: number; label: string }
   editTarget?: EditTarget
+  /** When set, the card links to this URL (e.g. the filtered transactions list). */
+  href?: string
 }
 
-export function SpendingCard({ label, spent, ceiling, projected, deduction, editTarget }: Props) {
+export function SpendingCard({ label, spent, ceiling, projected, deduction, editTarget, href }: Props) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -55,6 +58,7 @@ export function SpendingCard({ label, spent, ceiling, projected, deduction, edit
       <input
         autoFocus
         value={draft}
+        onClick={e => { e.preventDefault(); e.stopPropagation() }}
         onChange={e => setDraft(e.target.value)}
         onBlur={saveEdit}
         onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
@@ -71,7 +75,7 @@ export function SpendingCard({ label, spent, ceiling, projected, deduction, edit
       />
     ) : (
       <span
-        onClick={openEdit}
+        onClick={e => { e.preventDefault(); e.stopPropagation(); openEdit() }}
         title="Click to set budget"
         style={{ textDecoration: 'underline dotted', cursor: 'pointer' }}
       >
@@ -82,7 +86,7 @@ export function SpendingCard({ label, spent, ceiling, projected, deduction, edit
     <span>{formatCurrency(ceiling)}</span>
   )
 
-  return (
+  const card = (
     <div className="card">
       <div className="card-label">{label} · Ceiling {ceilingNode}</div>
       <div className="big-num">{formatCurrency(spent)}</div>
@@ -114,4 +118,9 @@ export function SpendingCard({ label, spent, ceiling, projected, deduction, edit
       )}
     </div>
   )
+
+  if (href) {
+    return <Link href={href} className="card-link">{card}</Link>
+  }
+  return card
 }
