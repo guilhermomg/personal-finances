@@ -248,9 +248,12 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   const projectedSpent = cards.reduce((s, c) => s + c.projected, 0)
   const totalCeiling = totalBudgetRow ? Number(totalBudgetRow.amount) : 999999999
   const discretionaryCeiling = totalCeiling - recurringTotal
-  // Discretionary = spending minus recurring items (use all transactions for future periods)
+  // Discretionary spent-to-date = total charged so far minus recurring charged so
+  // far. Both sides use the same date<=today basis as the cards' `spent` (0 for a
+  // period that hasn't started yet), so future periods read 0 instead of going
+  // negative from subtracting the full recurring total off a $0 spend.
   const recurringActualTotal = txs
-    .filter(t => t.recurring_transaction_id !== null && (periodStarted ? t.date <= todayStr : true))
+    .filter(t => t.recurring_transaction_id !== null && t.date <= todayStr)
     .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
   const discretionarySpent = totalSpent - recurringActualTotal
   // Projected discretionary — full-period spend (incl. scheduled recurring still to post)
