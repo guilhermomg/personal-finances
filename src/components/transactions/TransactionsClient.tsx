@@ -24,12 +24,28 @@ const SORT_LABELS: Record<SortKey, string> = {
   amount: 'Amount',
 }
 
-export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, paymentMethodConfigs, allCategories, paymentStyles }: {
+// Persisted "When" filter (date range / billing period) so a user's choice
+// survives navigation for the rest of the browser-tab session.
+const WHEN_STORAGE_KEY = 'tx-when-filter'
+type SavedWhenFilter = { mode: FilterMode; periodId: number | null; dateFrom: string; dateTo: string }
+
+function loadSavedWhenFilter(): SavedWhenFilter | null {
+  try {
+    const raw = sessionStorage.getItem(WHEN_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as SavedWhenFilter) : null
+  } catch {
+    return null
+  }
+}
+
+export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, initialWhenFromUrl, paymentMethodConfigs, allCategories, paymentStyles }: {
   transactions: Transaction[]
   billingPeriods: BillingPeriodOption[]
   initialPeriodId: number | null
   initialDateFrom?: string
   initialDateTo?: string
+  /** True when the URL explicitly set the When-filter (?month=/?from=/?to=). */
+  initialWhenFromUrl: boolean
   paymentMethodConfigs: PaymentMethodConfig[]
   allCategories: string[]
   paymentStyles: PaymentStyleMap
@@ -52,6 +68,34 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
   const [dateFrom, setDateFrom] = useState(initialDateFrom ?? '')
   const [dateTo, setDateTo] = useState(initialDateTo ?? '')
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+
+  // When the URL didn't specify a When-filter, restore the one the user last
+  // chose this session (read after mount to avoid an SSR hydration mismatch).
+  useEffect(() => {
+    if (initialWhenFromUrl) return
+    const saved = loadSavedWhenFilter()
+    if (!saved) return
+    setFilterMode(saved.mode)
+    setSelectedPeriodId(saved.periodId)
+    setDateFrom(saved.dateFrom)
+    setDateTo(saved.dateTo)
+  }, [initialWhenFromUrl])
+
+  // Persist the When-filter whenever the user changes it. Skips the first run so
+  // the initial (URL- or default-derived) values don't clobber a saved filter
+  // before the restore effect above can read it.
+  const skipWhenSave = useRef(true)
+  useEffect(() => {
+    if (skipWhenSave.current) { skipWhenSave.current = false; return }
+    try {
+      sessionStorage.setItem(
+        WHEN_STORAGE_KEY,
+        JSON.stringify({ mode: filterMode, periodId: selectedPeriodId, dateFrom, dateTo }),
+      )
+    } catch {
+      // ignore quota/availability errors — persistence is best-effort
+    }
+  }, [filterMode, selectedPeriodId, dateFrom, dateTo])
 
   const todayStr = new Date().toISOString().split('T')[0]
 
