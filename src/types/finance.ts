@@ -18,6 +18,16 @@ export type Transaction = {
   notes: string | null
   transaction_type: 'expense' | 'refund' | 'cashback'
   refund_for_transaction_id: number | null
+  // Per-category splits. Present only when a transaction has 2+ categories;
+  // single-category transactions rely on `category` + `amount` instead.
+  allocations?: TransactionAllocation[]
+}
+
+// A single category split of a transaction. Amounts are stored positive and,
+// across a transaction's allocations, sum to that transaction's `amount`.
+export type TransactionAllocation = {
+  category: string
+  amount: number
 }
 
 export type ChipStyle = {

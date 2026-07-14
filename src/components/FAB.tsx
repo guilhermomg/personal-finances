@@ -19,6 +19,7 @@ export function FAB({ allCategories, allMethods, allProviders, paymentMethodConf
       <button
         onClick={() => setOpen(true)}
         aria-label="Add transaction"
+        className="fab-button"
         style={{
           position: 'fixed',
           bottom: '28px',

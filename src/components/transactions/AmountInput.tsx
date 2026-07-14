@@ -14,18 +14,20 @@ type Props = {
   onValueChange: (value: string) => void
   style?: React.CSSProperties
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
+  placeholder?: string
 }
 
 // Implied-decimal currency entry: typed digits accumulate as cents and shift
 // two places. "1"→0.01, "12"→0.12, "125"→1.25, "1250"→12.50. Backspace drops
 // the last digit. Always renders a fixed 2-decimal string.
-export function AmountInput({ value, onValueChange, style, onKeyDown }: Props) {
+export function AmountInput({ value, onValueChange, style, onKeyDown, placeholder }: Props) {
   return (
     <input
       type="text"
       inputMode="numeric"
       style={style ?? inputStyle}
       value={value}
+      placeholder={placeholder}
       onKeyDown={onKeyDown}
       onChange={e => {
         const cents = parseInt(e.target.value.replace(/\D/g, ''), 10) || 0

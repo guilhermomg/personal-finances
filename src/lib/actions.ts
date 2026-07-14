@@ -2,6 +2,7 @@
 
 import { createFinancesAdminClient, ownerUserId } from './supabase/admin'
 import { getOrCreateCycleForTransaction, getOrCreateCycleByStatementDate } from './billing'
+import type { TransactionAllocation } from '../types/finance'
 
 type TransactionData = {
   description: string
@@ -13,16 +14,56 @@ type TransactionData = {
   statement_date: string | null
   transaction_type?: 'expense' | 'refund' | 'cashback'
   refund_for_transaction_id?: number | null
+  // Per-category splits. Length ≤ 1 → single-category (no allocation rows stored).
+  categories?: TransactionAllocation[]
+}
+
+// The category stored on the transaction row itself — the primary (largest)
+// split when a transaction is split, otherwise the single chosen category.
+function primaryCategory(categories: TransactionAllocation[] | undefined, fallback: string): string {
+  if (!categories || categories.length === 0) return fallback
+  return categories.reduce((max, a) => (a.amount > max.amount ? a : max), categories[0]).category
+}
+
+// Replaces a transaction's category splits. Stores rows only when there are 2+
+// categories; a single category relies on transactions.category/amount instead.
+async function reconcileAllocations(
+  db: ReturnType<typeof createFinancesAdminClient>,
+  transactionId: number,
+  categories: TransactionAllocation[] | undefined,
+) {
+  const { error: delError } = await db
+    .from('transaction_categories')
+    .delete()
+    .eq('transaction_id', transactionId)
+  if (delError) throw new Error(delError.message)
+
+  if (!categories || categories.length < 2) return
+
+  const rows = categories.map(a => ({
+    transaction_id: transactionId,
+    category: a.category,
+    amount: a.amount,
+    user_id: ownerUserId(),
+  }))
+  const { error: insError } = await db.from('transaction_categories').insert(rows)
+  if (insError) throw new Error(insError.message)
 }
 
 export async function addTransaction(data: TransactionData) {
   const db = createFinancesAdminClient()
+  const { categories, ...txData } = data
   const billing_cycle_id = data.statement_date
     ? await getOrCreateCycleByStatementDate(data.statement_date, data.payment_method)
     : await getOrCreateCycleForTransaction(data.date, data.payment_method)
   const transaction_id = crypto.randomUUID()
-  const { error } = await db.from('transactions').insert({ ...data, billing_cycle_id, transaction_id, user_id: ownerUserId() })
+  const { data: inserted, error } = await db
+    .from('transactions')
+    .insert({ ...txData, category: primaryCategory(categories, txData.category), billing_cycle_id, transaction_id, user_id: ownerUserId() })
+    .select('id')
+    .single()
   if (error) throw new Error(error.message)
+  await reconcileAllocations(db, (inserted as { id: number }).id, categories)
 }
 
 export async function upsertBudget(billingPeriodId: number, category: string | null, amount: number) {
@@ -201,14 +242,16 @@ export async function addBillingCyclePayment(
 
 export async function updateTransaction(id: number, data: TransactionData) {
   const db = createFinancesAdminClient()
+  const { categories, ...txData } = data
   const billing_cycle_id = data.statement_date
     ? await getOrCreateCycleByStatementDate(data.statement_date, data.payment_method)
     : await getOrCreateCycleForTransaction(data.date, data.payment_method)
   const { error } = await db
     .from('transactions')
-    .update({ ...data, billing_cycle_id })
+    .update({ ...txData, category: primaryCategory(categories, txData.category), billing_cycle_id })
     .eq('id', id)
   if (error) throw new Error(error.message)
+  await reconcileAllocations(db, id, categories)
 }
 
 export async function deleteTransaction(id: number) {

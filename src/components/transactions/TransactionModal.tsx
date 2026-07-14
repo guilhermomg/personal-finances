@@ -51,9 +51,9 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
     try {
       if (!isNew || mode === 'onetime') {
         const result = oneTimeRef.current?.getValues()
-        if (!result) { setError('Please fill in description and a valid amount'); setSaving(false); return }
-        const { data, newCategoryToAdd } = result
-        if (newCategoryToAdd) await addCategory(newCategoryToAdd)
+        if (!result) { setError('Please fill in description, a valid amount, and category splits that add up'); setSaving(false); return }
+        const { data, newCategories } = result
+        for (const c of newCategories) await addCategory(c)
         if (isNew) {
           await addTransaction(data)
         } else {

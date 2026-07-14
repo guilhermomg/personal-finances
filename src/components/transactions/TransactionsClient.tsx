@@ -29,6 +29,20 @@ const SORT_LABELS: Record<SortKey, string> = {
 const WHEN_STORAGE_KEY = 'tx-when-filter'
 type SavedWhenFilter = { mode: FilterMode; periodId: number | null; dateFrom: string; dateTo: string }
 
+// Tooltip listing every category split of a transaction, e.g. "Groceries: $60 · Home: $40".
+function splitTitle(t: Transaction): string {
+  return (t.allocations ?? []).map(a => `${a.category}: ${formatCurrency(Number(a.amount))}`).join('  ·  ')
+}
+
+function SplitBadge({ t }: { t: Transaction }) {
+  if (!t.allocations || t.allocations.length <= 1) return null
+  return (
+    <span title={splitTitle(t)} style={{ color: 'var(--accent2)', fontSize: '11px', marginLeft: '4px' }}>
+      +{t.allocations.length - 1}
+    </span>
+  )
+}
+
 function loadSavedWhenFilter(): SavedWhenFilter | null {
   try {
     const raw = sessionStorage.getItem(WHEN_STORAGE_KEY)
@@ -145,7 +159,9 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
       rows = rows.filter(t => t.description.toLowerCase().includes(q))
     }
     if (selectedCategories.size > 0)
-      rows = rows.filter(t => selectedCategories.has(t.category))
+      rows = rows.filter(t => t.allocations && t.allocations.length > 0
+        ? t.allocations.some(a => selectedCategories.has(a.category))
+        : selectedCategories.has(t.category))
     if (selectedMethods.size > 0)
       rows = rows.filter(t => selectedMethods.has(t.payment_method))
     if (recurringFilter === 'recurring') rows = rows.filter(t => t.recurring_transaction_id !== null)
@@ -338,7 +354,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                       </span>
                     )}
                   </td>
-                  <td style={{ color: 'var(--muted)', fontSize: '12px', whiteSpace: 'nowrap' }}>{t.category}</td>
+                  <td style={{ color: 'var(--muted)', fontSize: '12px', whiteSpace: 'nowrap' }}>{t.category}<SplitBadge t={t} /></td>
                   <td className="td-amt" style={t.transaction_type !== 'expense' ? { color: '#34c759' } : undefined}>
                     {formatCurrency((t.transaction_type === 'expense' ? 1 : -1) * Number(t.amount))}
                   </td>
@@ -440,7 +456,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                         {t.transaction_type === 'cashback' ? 'Cashback' : 'Refund'}
                       </span>
                     )}
-                    <span className="tx-list-sub" style={{ marginTop: 0 }}>· {t.category}</span>
+                    <span className="tx-list-sub" style={{ marginTop: 0 }}>· {t.category}<SplitBadge t={t} /></span>
                   </div>
                   {t.notes && (
                     <div style={{ fontSize: '10px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '3px' }}>

@@ -1,11 +1,52 @@
 import { createFinancesAdminClient } from './supabase/admin'
 import { getOrCreatePeriod } from './billing'
-import type { Transaction, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, PaymentMethodConfig } from '../types/finance'
+import type { Transaction, TransactionAllocation, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, PaymentMethodConfig } from '../types/finance'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function txSign(type: string): 1 | -1 {
   return type === 'expense' ? 1 : -1
+}
+
+// Signed [category, amount] pairs for one transaction. Uses per-category splits
+// when present, otherwise falls back to the single (category, amount).
+function txAllocations(t: Transaction): [string, number][] {
+  const sign = txSign(t.transaction_type)
+  if (t.allocations && t.allocations.length > 0)
+    return t.allocations.map(a => [a.category, sign * Number(a.amount)])
+  return [[t.category, sign * Number(t.amount)]]
+}
+
+// Accumulate a transaction's category splits into a running category→amount map.
+function addAllocations(acc: Record<string, number>, t: Transaction): void {
+  for (const [category, amount] of txAllocations(t)) {
+    acc[category] = (acc[category] ?? 0) + amount
+  }
+}
+
+// Fetches category splits for the given transactions and attaches them as
+// `allocations` (only on transactions that actually have splits).
+async function attachAllocations(
+  db: ReturnType<typeof createFinancesAdminClient>,
+  txs: Transaction[],
+): Promise<Transaction[]> {
+  if (txs.length === 0) return txs
+  const { data } = await db
+    .from('transaction_categories')
+    .select('transaction_id, category, amount')
+    .in('transaction_id', txs.map(t => t.id))
+
+  const byTx = new Map<number, TransactionAllocation[]>()
+  for (const r of (data ?? []) as { transaction_id: number; category: string; amount: number }[]) {
+    const arr = byTx.get(r.transaction_id) ?? []
+    arr.push({ category: r.category, amount: Number(r.amount) })
+    byTx.set(r.transaction_id, arr)
+  }
+
+  return txs.map(t => {
+    const allocations = byTx.get(t.id)
+    return allocations && allocations.length > 0 ? { ...t, allocations } : t
+  })
 }
 
 function formatCloseDate(dateStr: string): string {
@@ -67,7 +108,7 @@ export async function getTransactions(month?: string): Promise<Transaction[]> {
       .order('date', { ascending: false })
 
     if (error || !data) return []
-    return data as Transaction[]
+    return attachAllocations(db, data as Transaction[])
   }
 
   const { data, error } = await db
@@ -76,7 +117,7 @@ export async function getTransactions(month?: string): Promise<Transaction[]> {
     .order('date', { ascending: false })
 
   if (error || !data) return []
-  return data as Transaction[]
+  return attachAllocations(db, data as Transaction[])
 }
 
 // ── dashboard summary ─────────────────────────────────────────────────────────
@@ -104,7 +145,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     db.from('billing_cycle_payments').select('billing_cycle_id, amount').in('billing_cycle_id', cycleIds),
   ])
 
-  const txs = (txsRes.data ?? []) as Transaction[]
+  const txs = await attachAllocations(db, (txsRes.data ?? []) as Transaction[])
   const budgetRows = budgetsRes.data ?? []
 
   // Build payments map: cycleId → total amount paid
@@ -126,29 +167,23 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
 
   // ── groceries spending ────────────────────────────────────────────────────
   const periodStarted = currentPeriod.start_month.slice(0, 7) <= todayStr.slice(0, 7)
+  const groceriesOf = (t: Transaction) =>
+    txAllocations(t).reduce((s, [cat, amt]) => s + (cat === 'Groceries' ? amt : 0), 0)
   const groceriesSpent = txs
-    .filter(t => t.category === 'Groceries' && (periodStarted ? t.date <= todayStr : true))
-    .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
-  // Projected groceries — all grocery txs in the period regardless of date.
-  const groceriesProjected = txs
-    .filter(t => t.category === 'Groceries')
-    .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
+    .filter(t => (periodStarted ? t.date <= todayStr : true))
+    .reduce((s, t) => s + groceriesOf(t), 0)
+  // Projected groceries — all grocery splits in the period regardless of date.
+  const groceriesProjected = txs.reduce((s, t) => s + groceriesOf(t), 0)
 
   // ── per-category budget cards ──────────────────────────────────────────────
   // Spend-to-date per category (mirrors the groceries to-date rule), so every
   // budgeted category — even one with no spending yet — renders its own card.
   const categorySpentToDate = txs
     .filter(t => (periodStarted ? t.date <= todayStr : true))
-    .reduce<Record<string, number>>((acc, t) => {
-      acc[t.category] = (acc[t.category] ?? 0) + txSign(t.transaction_type) * Number(t.amount)
-      return acc
-    }, {})
+    .reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
   // Projected per category — all txs in the period regardless of date, mirroring
   // the projected figure on the Total Expenses / card summaries.
-  const categoryProjected = txs.reduce<Record<string, number>>((acc, t) => {
-    acc[t.category] = (acc[t.category] ?? 0) + txSign(t.transaction_type) * Number(t.amount)
-    return acc
-  }, {})
+  const categoryProjected = txs.reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
   const budgetCards = Object.entries(categoryBudgets)
     .map(([category, ceiling]) => ({
       category,
@@ -228,10 +263,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   const installTotal = installments.reduce((s, r) => s + r.amount, 0)
 
   // ── categories ────────────────────────────────────────────────────────────
-  const categoryMap = txs.reduce<Record<string, number>>((acc, t) => {
-    acc[t.category] = (acc[t.category] ?? 0) + txSign(t.transaction_type) * Number(t.amount)
-    return acc
-  }, {})
+  const categoryMap = txs.reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
   const categories = Object.entries(categoryMap)
     .map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount)
