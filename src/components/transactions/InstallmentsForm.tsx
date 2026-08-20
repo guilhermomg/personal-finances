@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useImperativeHandle, useState } from 'react'
-import type { PaymentMethodConfig } from '../../types/finance'
+import type { Account } from '../../types/finance'
 import { inputStyle, labelStyle } from './transaction-utils'
 import { AmountInput } from './AmountInput'
 
@@ -54,7 +54,7 @@ type Props = {
   allCategories: string[]
   allMethods: string[]
   allProviders: string[]
-  paymentMethodConfigs: PaymentMethodConfig[]
+  accounts: Account[]
 }
 
 export function InstallmentsForm({ ref, allCategories, allMethods, allProviders }: Props) {

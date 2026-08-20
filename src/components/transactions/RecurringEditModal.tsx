@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateTransaction, updateRecurringTransaction, addCategory, deactivateRecurringTransaction } from '../../lib/actions'
-import type { Transaction, PaymentMethodConfig } from '../../types/finance'
+import type { Transaction, Account } from '../../types/finance'
 import { inputStyle, labelStyle } from './transaction-utils'
 import { AmountInput, toAmountString } from './AmountInput'
 import { ConfirmModal } from '../ConfirmModal'
@@ -21,7 +21,7 @@ type Props = {
   transaction?: Transaction
   allCategories: string[]
   allMethods: string[]
-  paymentMethodConfigs: PaymentMethodConfig[]
+  accounts: Account[]
   onClose: () => void
 }
 

@@ -122,12 +122,12 @@ export async function upsertBudgetForward(fromPeriodId: number, category: string
   }
 }
 
-export async function updateCreditLimit(configId: number, amount: number | null) {
+export async function updateCreditLimit(accountId: number, amount: number | null) {
   const db = createFinancesAdminClient()
   const { error } = await db
-    .from('billing_cycle_configs')
+    .from('accounts')
     .update({ credit_limit: amount })
-    .eq('id', configId)
+    .eq('id', accountId)
   if (error) throw new Error(error.message)
 }
 
@@ -192,7 +192,7 @@ export async function updateRecurringTransaction(id: number, data: RecurringUpda
   // Fetch the old template to carry over fields not exposed in the edit form
   const { data: old, error: fetchError } = await db
     .from('recurring_transactions')
-    .select('frequency, config_id')
+    .select('frequency, account_id')
     .eq('id', id)
     .single()
   if (fetchError || !old) throw new Error(fetchError?.message ?? 'Recurring transaction not found')
@@ -221,7 +221,7 @@ export async function updateRecurringTransaction(id: number, data: RecurringUpda
     frequency: (old as any).frequency,
     start_date: today,
     active: true,
-    config_id: (old as any).config_id,
+    account_id: (old as any).account_id,
     user_id: ownerUserId(),
   })
   if (insertError) throw new Error(insertError.message)

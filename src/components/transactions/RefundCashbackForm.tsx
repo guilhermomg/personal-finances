@@ -1,7 +1,7 @@
 'use client'
 
 import { useImperativeHandle, useState } from 'react'
-import type { PaymentMethodConfig } from '../../types/finance'
+import type { Account } from '../../types/finance'
 import {
   isCreditCard,
   getBillingCycleOptions,
@@ -31,10 +31,10 @@ type Props = {
   ref?: React.Ref<RefundCashbackFormHandle>
   allCategories: string[]
   allMethods: string[]
-  paymentMethodConfigs: PaymentMethodConfig[]
+  accounts: Account[]
 }
 
-export function RefundCashbackForm({ ref, allCategories, allMethods, paymentMethodConfigs }: Props) {
+export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }: Props) {
   const todayStr = new Date().toISOString().split('T')[0]
   const initPm = allMethods[0] ?? ''
 
@@ -47,8 +47,8 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, paymentMeth
     payment_method: initPm,
     amount: '0.00',
     notes: '',
-    statement_date: isCreditCard(initPm, paymentMethodConfigs)
-      ? getDefaultStatementDate(todayStr, initPm, paymentMethodConfigs)
+    statement_date: isCreditCard(initPm, accounts)
+      ? getDefaultStatementDate(todayStr, initPm, accounts)
       : '',
   })
 
@@ -81,13 +81,13 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, paymentMeth
         const updated = { ...prev, [field]: e.target.value }
         if (field === 'payment_method') {
           const pm = e.target.value
-          updated.statement_date = isCreditCard(pm, paymentMethodConfigs)
-            ? getDefaultStatementDate(prev.date || todayStr, pm, paymentMethodConfigs)
+          updated.statement_date = isCreditCard(pm, accounts)
+            ? getDefaultStatementDate(prev.date || todayStr, pm, accounts)
             : ''
         } else if (field === 'date') {
           const dateStr = e.target.value || todayStr
-          updated.statement_date = isCreditCard(prev.payment_method, paymentMethodConfigs)
-            ? getDefaultStatementDate(dateStr, prev.payment_method, paymentMethodConfigs)
+          updated.statement_date = isCreditCard(prev.payment_method, accounts)
+            ? getDefaultStatementDate(dateStr, prev.payment_method, accounts)
             : ''
         }
         return updated
@@ -104,8 +104,8 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, paymentMeth
     }))
   }
 
-  const billingCycleOptions = isCreditCard(form.payment_method, paymentMethodConfigs)
-    ? getBillingCycleOptions(form.date || todayStr, form.payment_method, paymentMethodConfigs)
+  const billingCycleOptions = isCreditCard(form.payment_method, accounts)
+    ? getBillingCycleOptions(form.date || todayStr, form.payment_method, accounts)
     : []
 
   const typeTabBase: React.CSSProperties = {

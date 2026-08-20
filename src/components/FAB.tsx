@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { TransactionModal } from './transactions/TransactionModal'
-import type { PaymentMethodConfig } from '../types/finance'
+import type { Account } from '../types/finance'
 import type { PaymentCard } from './transactions/PaymentForm'
 
-export function FAB({ allCategories, allMethods, allProviders, paymentMethodConfigs, creditCards = [] }: {
+export function FAB({ allCategories, allMethods, allProviders, accounts, creditCards = [] }: {
   allCategories: string[]
   allMethods: string[]
   allProviders: string[]
-  paymentMethodConfigs: PaymentMethodConfig[]
+  accounts: Account[]
   creditCards?: PaymentCard[]
 }) {
   const [open, setOpen] = useState(false)
@@ -48,7 +48,7 @@ export function FAB({ allCategories, allMethods, allProviders, paymentMethodConf
           allCategories={allCategories}
           allMethods={allMethods}
           allProviders={allProviders}
-          paymentMethodConfigs={paymentMethodConfigs}
+          accounts={accounts}
           creditCards={creditCards}
           onClose={() => setOpen(false)}
         />

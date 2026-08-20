@@ -1,7 +1,7 @@
 'use client'
 
 import { useImperativeHandle, useState } from 'react'
-import type { Transaction, TransactionAllocation, PaymentMethodConfig } from '../../types/finance'
+import type { Transaction, TransactionAllocation, Account } from '../../types/finance'
 import {
   isCreditCard,
   getBillingCycleOptions,
@@ -30,7 +30,7 @@ type Props = {
   ref?: React.Ref<OneTimeFormHandle>
   allCategories: string[]
   allMethods: string[]
-  paymentMethodConfigs: PaymentMethodConfig[]
+  accounts: Account[]
   initialData?: Transaction
 }
 
@@ -40,15 +40,15 @@ type CatRow = { category: string; amount: string; isNew: boolean }
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
-export function OneTimeForm({ ref, allCategories, allMethods, paymentMethodConfigs, initialData }: Props) {
+export function OneTimeForm({ ref, allCategories, allMethods, accounts, initialData }: Props) {
   const todayStr = new Date().toISOString().split('T')[0]
   const initPm = initialData?.payment_method ?? allMethods[0] ?? ''
   const initDate = initialData?.date ?? todayStr
 
   function initStatementDate(): string {
-    if (!isCreditCard(initPm, paymentMethodConfigs)) return ''
+    if (!isCreditCard(initPm, accounts)) return ''
     if (initialData?.statement_date) return initialData.statement_date
-    return getDefaultStatementDate(initDate, initPm, paymentMethodConfigs)
+    return getDefaultStatementDate(initDate, initPm, accounts)
   }
 
   const [form, setForm] = useState({
@@ -139,13 +139,13 @@ export function OneTimeForm({ ref, allCategories, allMethods, paymentMethodConfi
         const updated = { ...prev, [field]: e.target.value }
         if (field === 'payment_method') {
           const pm = e.target.value
-          updated.statement_date = isCreditCard(pm, paymentMethodConfigs)
-            ? getDefaultStatementDate(prev.date || todayStr, pm, paymentMethodConfigs)
+          updated.statement_date = isCreditCard(pm, accounts)
+            ? getDefaultStatementDate(prev.date || todayStr, pm, accounts)
             : ''
         } else if (field === 'date') {
           const dateStr = e.target.value || todayStr
-          updated.statement_date = isCreditCard(prev.payment_method, paymentMethodConfigs)
-            ? getDefaultStatementDate(dateStr, prev.payment_method, paymentMethodConfigs)
+          updated.statement_date = isCreditCard(prev.payment_method, accounts)
+            ? getDefaultStatementDate(dateStr, prev.payment_method, accounts)
             : ''
         }
         return updated
@@ -223,8 +223,8 @@ export function OneTimeForm({ ref, allCategories, allMethods, paymentMethodConfi
     )
   }
 
-  const billingCycleOptions = isCreditCard(form.payment_method, paymentMethodConfigs)
-    ? getBillingCycleOptions(form.date || todayStr, form.payment_method, paymentMethodConfigs)
+  const billingCycleOptions = isCreditCard(form.payment_method, accounts)
+    ? getBillingCycleOptions(form.date || todayStr, form.payment_method, accounts)
     : []
 
   const splitLinkStyle: React.CSSProperties = {

@@ -1,17 +1,17 @@
-import type { PaymentMethodConfig } from '../../types/finance'
+import type { Account } from '../../types/finance'
 
-export function getCycleDay(pm: string, configs: PaymentMethodConfig[]): number | undefined {
+export function getCycleDay(pm: string, configs: Account[]): number | undefined {
   return configs.find(c => c.payment_method === pm && c.account_type === 'credit_card')?.cycle_start_day
 }
 
-export function isCreditCard(pm: string, configs: PaymentMethodConfig[]): boolean {
+export function isCreditCard(pm: string, configs: Account[]): boolean {
   return configs.some(c => c.payment_method === pm && c.account_type === 'credit_card')
 }
 
 export function getBillingCycleOptions(
   dateStr: string,
   pm: string,
-  configs: PaymentMethodConfig[]
+  configs: Account[]
 ): { label: string; value: string }[] {
   const closeDay = getCycleDay(pm, configs)
   if (closeDay === undefined) return []
@@ -35,7 +35,7 @@ export function getBillingCycleOptions(
   ]
 }
 
-export function getDefaultStatementDate(dateStr: string, pm: string, configs: PaymentMethodConfig[]): string {
+export function getDefaultStatementDate(dateStr: string, pm: string, configs: Account[]): string {
   const closeDay = getCycleDay(pm, configs)
   if (closeDay === undefined) return ''
 

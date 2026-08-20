@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { getTransactions, getBillingPeriods, getPaymentMethodConfigs, getCategories, getPaymentMethodStyles } from '../lib/finance'
+import { getTransactions, getBillingPeriods, getAccounts, getCategories, getPaymentMethodStyles } from '../lib/finance'
 import { TransactionsClient } from '../components/transactions/TransactionsClient'
 
 export default async function TransactionsPage({
@@ -9,10 +9,10 @@ export default async function TransactionsPage({
 }) {
   const { month, from, to } = await searchParams
 
-  const [transactions, billingPeriods, paymentMethodConfigs, allCategories, paymentStyles] = await Promise.all([
+  const [transactions, billingPeriods, accounts, allCategories, paymentStyles] = await Promise.all([
     getTransactions(),          // always load all — client-side filtering handles the rest
     getBillingPeriods(),
-    getPaymentMethodConfigs(),
+    getAccounts(),
     getCategories(),
     getPaymentMethodStyles(),
   ])
@@ -50,7 +50,7 @@ export default async function TransactionsPage({
         initialDateFrom={dateFrom}
         initialDateTo={dateTo}
         initialWhenFromUrl={whenFromUrl}
-        paymentMethodConfigs={paymentMethodConfigs}
+        accounts={accounts}
         allCategories={allCategories}
         paymentStyles={paymentStyles}
       />

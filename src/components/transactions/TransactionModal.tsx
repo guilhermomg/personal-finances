@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { addTransaction, updateTransaction, deleteTransaction, addInstallments, addCategory, addBillingCyclePayment } from '../../lib/actions'
-import type { Transaction, PaymentMethodConfig } from '../../types/finance'
+import type { Transaction, Account } from '../../types/finance'
 import { OneTimeForm, type OneTimeFormHandle } from './OneTimeForm'
 import { InstallmentsForm, type InstallmentsFormHandle } from './InstallmentsForm'
 import { RefundCashbackForm, type RefundCashbackFormHandle } from './RefundCashbackForm'
@@ -14,14 +14,14 @@ type Props = {
   allCategories: string[]
   allMethods: string[]
   allProviders: string[]
-  paymentMethodConfigs: PaymentMethodConfig[]
+  accounts: Account[]
   creditCards?: PaymentCard[]
   onClose: () => void
 }
 
 type Mode = 'onetime' | 'installments' | 'refund' | 'payment'
 
-export function TransactionModal({ transaction, allCategories, allMethods, allProviders, paymentMethodConfigs, creditCards = [], onClose }: Props) {
+export function TransactionModal({ transaction, allCategories, allMethods, allProviders, accounts, creditCards = [], onClose }: Props) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -190,7 +190,7 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
               ref={oneTimeRef}
               allCategories={allCategories}
               allMethods={allMethods}
-              paymentMethodConfigs={paymentMethodConfigs}
+              accounts={accounts}
               initialData={transaction}
             />
           ) : mode === 'installments' ? (
@@ -199,14 +199,14 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
               allCategories={allCategories}
               allMethods={allMethods}
               allProviders={allProviders}
-              paymentMethodConfigs={paymentMethodConfigs}
+              accounts={accounts}
             />
           ) : mode === 'refund' ? (
             <RefundCashbackForm
               ref={refundRef}
               allCategories={allCategories}
               allMethods={allMethods}
-              paymentMethodConfigs={paymentMethodConfigs}
+              accounts={accounts}
             />
           ) : (
             <PaymentForm

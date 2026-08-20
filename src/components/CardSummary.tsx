@@ -8,7 +8,7 @@ import { formatCurrency, formatPct, barColor } from '../lib/format'
 import type { CardData } from '../types/finance'
 import { ProgressBar, type BarColor } from './ProgressBar'
 
-export function CardSummary({ name, spent, projected, closeDate, month, configId, cycleId, totalPaid, creditLimit, accountType, cycleStartDate, cycleEndDate }: CardData & { month?: string }) {
+export function CardSummary({ name, spent, projected, closeDate, month, accountId, cycleId, totalPaid, creditLimit, accountType, cycleStartDate, cycleEndDate }: CardData & { month?: string }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -36,7 +36,7 @@ export function CardSummary({ name, spent, projected, closeDate, month, configId
     const amount = draft.trim() === '' ? null : parseFloat(draft)
     if (amount !== null && isNaN(amount)) { setEditing(false); return }
     startTransition(async () => {
-      await updateCreditLimit(configId, amount)
+      await updateCreditLimit(accountId, amount)
       setEditing(false)
       router.refresh()
     })

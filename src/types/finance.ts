@@ -52,7 +52,7 @@ export type CardData = {
   spent: number
   projected: number
   closeDate: string
-  configId: number
+  accountId: number
   cycleId: number         // billing_cycles.id for this card's current cycle
   totalPaid: number       // sum of all billing_cycle_payments for this cycle
   creditLimit: number | null
@@ -88,7 +88,7 @@ export type CumulativePoint = {
   installments: number
 }
 
-export type PaymentMethodConfig = {
+export type Account = {
   payment_method: string
   cycle_start_day: number
   account_type: 'credit_card' | 'bank_account'

@@ -1,4 +1,4 @@
-import { getDashboardData, getPaymentMethodConfigs, getCategories, getProviders, getPaymentMethodStyles } from '../lib/finance'
+import { getDashboardData, getAccounts, getCategories, getProviders, getPaymentMethodStyles } from '../lib/finance'
 import { SpendingCard } from '../components/SpendingCard'
 import { CardSummary } from '../components/CardSummary'
 import { TransactionTable } from '../components/TransactionTable'
@@ -16,9 +16,9 @@ export default async function FinancesPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { month } = await searchParams
-  const [data, paymentMethodConfigs, allCategories, allProviders, paymentStyles] = await Promise.all([
+  const [data, accounts, allCategories, allProviders, paymentStyles] = await Promise.all([
     getDashboardData(month as string | undefined),
-    getPaymentMethodConfigs(),
+    getAccounts(),
     getCategories(),
     getProviders(),
     getPaymentMethodStyles(),
@@ -108,7 +108,7 @@ export default async function FinancesPage({
           totalSpent={data.totalCeiling}
           allCategories={allCategories}
           allMethods={data.cards.map(c => c.name)}
-          paymentMethodConfigs={paymentMethodConfigs}
+          accounts={accounts}
           paymentStyles={paymentStyles}
         />
         <TransactionTable
@@ -133,7 +133,7 @@ export default async function FinancesPage({
         allCategories={allCategories}
         allMethods={data.cards.map(c => c.name)}
         allProviders={allProviders}
-        paymentMethodConfigs={paymentMethodConfigs}
+        accounts={accounts}
         creditCards={data.cards
           .filter(c => c.accountType === 'credit_card')
           .map(c => ({ name: c.name, cycleId: c.cycleId }))}

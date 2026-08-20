@@ -1,6 +1,6 @@
 import { createFinancesAdminClient } from './supabase/admin'
 import { getOrCreatePeriod } from './billing'
-import type { Transaction, TransactionAllocation, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, PaymentMethodConfig } from '../types/finance'
+import type { Transaction, TransactionAllocation, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, Account } from '../types/finance'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   // Billing cycles for this period, joined with their card config
   const { data: cyclesData, error: cyclesError } = await db
     .from('billing_cycles')
-    .select('id, start_date, end_date, due_date, status, config:billing_cycle_configs(id, name, payment_method, credit_limit, account_type)')
+    .select('id, start_date, end_date, due_date, status, account:accounts(id, name, payment_method, credit_limit, account_type)')
     .eq('billing_period_id', currentPeriod.id)
 
   if (cyclesError || !cyclesData || cyclesData.length === 0) return null
@@ -195,7 +195,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
 
   // ── cards ─────────────────────────────────────────────────────────────────
   const cards: CardData[] = cyclesData.map((cycle: any) => {
-    const { id: configId, payment_method, credit_limit, account_type } = cycle.config
+    const { id: accountId, payment_method, credit_limit, account_type } = cycle.account
     const cycleTxs = txs.filter(t => t.billing_cycle_id === cycle.id)
     const projected = cycleTxs.reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
     const spent = cycleTxs.filter(t => t.date <= todayStr).reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
@@ -204,7 +204,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
       spent,
       projected,
       closeDate: formatCloseDate(cycle.end_date),
-      configId,
+      accountId,
       cycleId: cycle.id as number,
       totalPaid: paymentsById[cycle.id] ?? 0,
       creditLimit: credit_limit != null ? Number(credit_limit) : null,
@@ -359,13 +359,13 @@ export async function getCategories(): Promise<string[]> {
   return (data ?? []).map((c: any) => c.name)
 }
 
-export async function getPaymentMethodConfigs(): Promise<PaymentMethodConfig[]> {
+export async function getAccounts(): Promise<Account[]> {
   const db = createFinancesAdminClient()
   const { data } = await db
-    .from('billing_cycle_configs')
+    .from('accounts')
     .select('payment_method, cycle_start_day, account_type, credit_limit')
     .eq('active', true)
-  return (data ?? []) as PaymentMethodConfig[]
+  return (data ?? []) as Account[]
 }
 
 // Returns the date range (min start_date, max end_date) across all billing cycles

@@ -14,7 +14,7 @@ export function periodMonthForDate(dateStr: string, cycleStartDay: number): stri
 }
 
 // Returns the existing billing period for a given YYYY-MM, or creates it
-// (along with its billing_cycles) from the active billing_cycle_configs.
+// (along with its billing_cycles) from the active accounts.
 export async function getOrCreatePeriod(yearMonth: string): Promise<{
   id: number
   name: string
@@ -47,7 +47,7 @@ export async function getOrCreatePeriod(yearMonth: string): Promise<{
   if (periodError || !period) throw new Error(`Failed to get billing period: ${periodError?.message}`)
 
   const { data: configs } = await db
-    .from('billing_cycle_configs')
+    .from('accounts')
     .select('id, cycle_start_day, cycle_end_day, payment_due_day')
     .eq('active', true)
 
@@ -65,7 +65,7 @@ export async function getOrCreatePeriod(yearMonth: string): Promise<{
     }
     return {
       billing_period_id: period.id,
-      config_id: config.id,
+      account_id: config.id,
       start_date: `${year}-${pad(month)}-${pad(config.cycle_start_day)}`,
       end_date: endDateStr,
       due_date: dueDateStr,
@@ -101,25 +101,25 @@ export async function getOrCreatePeriod(yearMonth: string): Promise<{
   // UPDATE name and end_month unconditionally so existing periods self-heal on next load.
   await db.from('billing_periods').update({ name: periodName, end_month: endMonthStr }).eq('id', period.id)
 
-  // Upsert cycles — the unique constraint on (billing_period_id, config_id)
+  // Upsert cycles — the unique constraint on (billing_period_id, account_id)
   // ensures concurrent requests never produce duplicates.
   await db
     .from('billing_cycles')
-    .upsert(cycles, { onConflict: 'billing_period_id,config_id', ignoreDuplicates: true })
+    .upsert(cycles, { onConflict: 'billing_period_id,account_id', ignoreDuplicates: true })
 
   // Seed recurring transaction records for any cycle that doesn't have them yet.
   // Fetch cycles (with date ranges), configs, templates, and existing recurring txs in parallel.
   const { data: periodCycles } = await db
     .from('billing_cycles')
-    .select('id, config_id, start_date, end_date')
+    .select('id, account_id, start_date, end_date')
     .eq('billing_period_id', period.id)
 
   if (periodCycles && periodCycles.length > 0) {
     const cycleIds = periodCycles.map((c: any) => c.id as number)
-    const configIds = periodCycles.map((c: any) => c.config_id as number)
+    const accountIds = periodCycles.map((c: any) => c.account_id as number)
 
     const [configsRes, templatesRes, existingTxsRes] = await Promise.all([
-      db.from('billing_cycle_configs').select('id, payment_method').in('id', configIds),
+      db.from('accounts').select('id, payment_method').in('id', accountIds),
       db.from('recurring_transactions').select('id, description, category, amount, payment_method, frequency, start_date, day_of_month').eq('active', true),
       db.from('transactions').select('recurring_transaction_id, billing_cycle_id').in('billing_cycle_id', cycleIds).not('recurring_transaction_id', 'is', null),
     ])
@@ -131,7 +131,7 @@ export async function getOrCreatePeriod(yearMonth: string): Promise<{
 
     const txsToInsert: any[] = []
     for (const cycle of periodCycles) {
-      const config = configMap[cycle.config_id]
+      const config = configMap[cycle.account_id]
       if (!config) continue
 
       const matchingTemplates = (templatesRes.data ?? []).filter((rt: any) => {
@@ -229,7 +229,7 @@ export async function getOrCreateCycleByStatementDate(
   const db = createFinancesAdminClient()
 
   const { data: config } = await db
-    .from('billing_cycle_configs')
+    .from('accounts')
     .select('id')
     .eq('payment_method', paymentMethod)
     .eq('active', true)
@@ -250,7 +250,7 @@ export async function getOrCreateCycleByStatementDate(
     .from('billing_cycles')
     .select('id')
     .eq('billing_period_id', period.id)
-    .eq('config_id', config.id)
+    .eq('account_id', config.id)
     .maybeSingle()
 
   return cycle?.id ?? null
@@ -265,7 +265,7 @@ export async function getOrCreateCycleForTransaction(
   const db = createFinancesAdminClient()
 
   const { data: config } = await db
-    .from('billing_cycle_configs')
+    .from('accounts')
     .select('id, cycle_start_day')
     .eq('payment_method', paymentMethod)
     .eq('active', true)
@@ -280,7 +280,7 @@ export async function getOrCreateCycleForTransaction(
     .from('billing_cycles')
     .select('id')
     .eq('billing_period_id', period.id)
-    .eq('config_id', config.id)
+    .eq('account_id', config.id)
     .maybeSingle()
 
   return cycle?.id ?? null

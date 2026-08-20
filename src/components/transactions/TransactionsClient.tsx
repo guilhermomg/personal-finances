@@ -11,7 +11,7 @@ import { type FilterMode } from './DateBillingFilter'
 import { TransactionModal } from './TransactionModal'
 import { RecurringEditModal } from './RecurringEditModal'
 import { FAB } from '../FAB'
-import type { Transaction, PaymentMethodConfig, BillingPeriodOption, PaymentStyleMap } from '../../types/finance'
+import type { Transaction, Account, BillingPeriodOption, PaymentStyleMap } from '../../types/finance'
 
 type SortKey = 'date' | 'description' | 'category' | 'amount'
 type SortDir = 'asc' | 'desc'
@@ -52,7 +52,7 @@ function loadSavedWhenFilter(): SavedWhenFilter | null {
   }
 }
 
-export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, initialWhenFromUrl, paymentMethodConfigs, allCategories, paymentStyles }: {
+export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, initialWhenFromUrl, accounts, allCategories, paymentStyles }: {
   transactions: Transaction[]
   billingPeriods: BillingPeriodOption[]
   initialPeriodId: number | null
@@ -60,7 +60,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
   initialDateTo?: string
   /** True when the URL explicitly set the When-filter (?month=/?from=/?to=). */
   initialWhenFromUrl: boolean
-  paymentMethodConfigs: PaymentMethodConfig[]
+  accounts: Account[]
   allCategories: string[]
   paymentStyles: PaymentStyleMap
 }) {
@@ -488,7 +488,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
             transaction={editingTransaction}
             allCategories={allCategories}
             allMethods={allMethods}
-            paymentMethodConfigs={paymentMethodConfigs}
+            accounts={accounts}
             onClose={() => setEditingTransaction(null)}
           />
         ) : (
@@ -497,12 +497,12 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
             allCategories={allCategories}
             allMethods={allMethods}
             allProviders={allProviders}
-            paymentMethodConfigs={paymentMethodConfigs}
+            accounts={accounts}
             onClose={() => setEditingTransaction(null)}
           />
         )
       )}
-      <FAB allCategories={allCategories} allMethods={allMethods} allProviders={allProviders} paymentMethodConfigs={paymentMethodConfigs} />
+      <FAB allCategories={allCategories} allMethods={allMethods} allProviders={allProviders} accounts={accounts} />
     </>
   )
 }
