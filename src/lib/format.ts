@@ -44,3 +44,16 @@ export function txTypeLabel(type: TransactionType | undefined): string | null {
 export function txIsCredit(type: TransactionType | undefined): boolean {
   return txDisplaySign(type) === -1
 }
+
+// The other convention: bank/ledger framing, where money arriving is positive
+// and money leaving is negative — the inverse of the spend frame above.
+//
+// The dashboard is spend-framed on purpose: budgets, category totals and card
+// summaries all answer "how much did I spend", where positive-means-spent is
+// the natural reading and ceilings are positive. The transactions list is not a
+// spending summary but a mixed ledger, so it reads the way a bank statement
+// does. Same data, different question — hence two named signs rather than one
+// global convention bent to fit both.
+export function txLedgerSign(type: TransactionType | undefined): 1 | -1 {
+  return txDisplaySign(type) === 1 ? -1 : 1
+}

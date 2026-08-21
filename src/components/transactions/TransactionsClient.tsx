@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Chip } from '../Chip'
 import { chipProps } from '../chipUtils'
-import { formatCurrency, txDisplaySign, txTypeLabel, txIsCredit } from '../../lib/format'
+import { formatCurrency, txLedgerSign, txTypeLabel, txIsCredit } from '../../lib/format'
 import { MultiSelect } from './MultiSelect'
 import { DateBillingFilterDropdown } from './DateBillingFilterDropdown'
 import { type FilterMode } from './DateBillingFilter'
@@ -357,7 +357,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                   </td>
                   <td style={{ color: 'var(--muted)', fontSize: '12px', whiteSpace: 'nowrap' }}>{t.category}<SplitBadge t={t} /></td>
                   <td className="td-amt" style={txIsCredit(t.transaction_type) ? { color: '#34c759' } : undefined}>
-                    {formatCurrency(txDisplaySign(t.transaction_type) * Number(t.amount))}
+                    {formatCurrency(txLedgerSign(t.transaction_type) * Number(t.amount))}
                   </td>
                   <td style={{ whiteSpace: 'nowrap', paddingLeft: '12px' }}>
                     <Chip {...chipProps(paymentStyles, t.payment_method)} />
@@ -397,7 +397,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
               <tr className="table-foot">
                 <td colSpan={3}>Total</td>
                 <td className="td-amt">
-                  {formatCurrency(filtered.reduce((s, t) => s + txDisplaySign(t.transaction_type) * Number(t.amount), 0))}
+                  {formatCurrency(filtered.reduce((s, t) => s + txLedgerSign(t.transaction_type) * Number(t.amount), 0))}
                 </td>
                 <td colSpan={3} />
               </tr>
@@ -435,7 +435,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                       )}
                     </span>
                     <span className="tx-list-amount" style={txIsCredit(t.transaction_type) ? { color: '#34c759' } : undefined}>
-                      {formatCurrency(txDisplaySign(t.transaction_type) * Number(t.amount))}
+                      {formatCurrency(txLedgerSign(t.transaction_type) * Number(t.amount))}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
@@ -470,7 +470,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
           ))}
           <div className="tx-list-footer">
             <span>Total</span>
-            <span>{formatCurrency(filtered.reduce((s, t) => s + txDisplaySign(t.transaction_type) * Number(t.amount), 0))}</span>
+            <span>{formatCurrency(filtered.reduce((s, t) => s + txLedgerSign(t.transaction_type) * Number(t.amount), 0))}</span>
           </div>
         </div>
 
