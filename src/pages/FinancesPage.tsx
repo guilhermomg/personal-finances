@@ -136,6 +136,7 @@ export default async function FinancesPage({
             total={data.incomeTotal}
             totalSpent={data.incomeTotal}
             totalColor="#34c759"
+            amountSign="magnitude"
             paymentStyles={paymentStyles}
           />
         </div>

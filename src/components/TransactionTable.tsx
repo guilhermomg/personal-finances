@@ -24,8 +24,17 @@ const neutralBadgeStyle: React.CSSProperties = {
   border: '1px solid var(--border)',
 }
 
-function txDisplayAmount(row: TransactionRow) {
-  return txDisplaySign(row.transaction_type) * row.amount
+// How a row's amount is displayed.
+//
+//   'signed'    — credits are negated, so they read as offsets against the
+//                 spending the table is about. Right for a mixed table.
+//   'magnitude' — amounts as stored. Right when every row points the same way
+//                 (an Income table), where negating each row would contradict
+//                 the positive total in the footer.
+export type AmountSign = 'signed' | 'magnitude'
+
+function txDisplayAmount(row: TransactionRow, mode: AmountSign = 'signed') {
+  return mode === 'magnitude' ? row.amount : txDisplaySign(row.transaction_type) * row.amount
 }
 
 function CreditBadge({ type }: { type?: TransactionType }) {
@@ -45,9 +54,10 @@ type Props = {
   totalColor?: string
   paymentStyles: PaymentStyleMap
   onRowClick?: (row: TransactionRow) => void
+  amountSign?: AmountSign
 }
 
-export function TransactionTable({ title, dotColor, rows, total, totalSpent, totalColor, paymentStyles, onRowClick }: Props) {
+export function TransactionTable({ title, dotColor, rows, total, totalSpent, totalColor, paymentStyles, onRowClick, amountSign = 'signed' }: Props) {
   const todayStr = new Date().toISOString().split('T')[0]
 
   return (
@@ -83,7 +93,7 @@ export function TransactionTable({ title, dotColor, rows, total, totalSpent, tot
                 )}
                 <span style={{ marginLeft: '6px' }}>
                   {row.description}
-                  <CreditBadge type={row.transaction_type} />
+                  {amountSign === 'signed' && <CreditBadge type={row.transaction_type} />}
                   {row.notes && (
                     <span style={{ display: 'block', fontSize: '10px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '1px' }}>
                       {row.notes}
@@ -92,9 +102,10 @@ export function TransactionTable({ title, dotColor, rows, total, totalSpent, tot
                 </span>
               </td>
               <td className="td-pct">{new Date(row.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
-              <td className="td-pct">{formatPct(txDisplayAmount(row), totalSpent)}</td>
-              <td className="td-amt" style={txDisplayAmount(row) < 0 ? { color: '#34c759' } : undefined}>
-                {formatCurrency(txDisplayAmount(row))}
+              <td className="td-pct">{formatPct(txDisplayAmount(row, amountSign), totalSpent)}</td>
+              {/* Money arriving reads green whichever way the amount is signed. */}
+              <td className="td-amt" style={txIsCredit(row.transaction_type) ? { color: '#34c759' } : undefined}>
+                {formatCurrency(txDisplayAmount(row, amountSign))}
               </td>
             </tr>
           ))}
@@ -135,7 +146,7 @@ export function TransactionTable({ title, dotColor, rows, total, totalSpent, tot
                   )}
                   <span className="tx-list-desc">
                     {row.description}
-                    <CreditBadge type={row.transaction_type} />
+                    {amountSign === 'signed' && <CreditBadge type={row.transaction_type} />}
                     {row.notes && (
                       <span style={{ display: 'block', fontSize: '10px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '1px' }}>
                         {row.notes}
@@ -143,11 +154,11 @@ export function TransactionTable({ title, dotColor, rows, total, totalSpent, tot
                     )}
                   </span>
                 </div>
-                <span className="tx-list-amount" style={txDisplayAmount(row) < 0 ? { color: '#34c759' } : undefined}>
-                  {formatCurrency(txDisplayAmount(row))}
+                <span className="tx-list-amount" style={txIsCredit(row.transaction_type) ? { color: '#34c759' } : undefined}>
+                  {formatCurrency(txDisplayAmount(row, amountSign))}
                 </span>
               </div>
-              <div className="tx-list-sub">{dateLabel} · {formatPct(txDisplayAmount(row), totalSpent)}</div>
+              <div className="tx-list-sub">{dateLabel} · {formatPct(txDisplayAmount(row, amountSign), totalSpent)}</div>
             </div>
           )
         })}
