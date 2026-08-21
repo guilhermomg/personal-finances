@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createFinancesAdminClient, ownerUserId } from './supabase/admin'
-import type { AccountBalance, BalanceAnchor, TransactionType } from '../types/finance'
+import type { AccountBalance, BalanceAnchor, BalanceOutlook, TransactionType } from '../types/finance'
 
 // Balance maintenance lives here rather than in database triggers, so the rules
 // are visible in the codebase and testable without a database round-trip.
@@ -362,4 +362,43 @@ export async function setBalanceAnchor(
     )
   if (error) throw new Error(`set anchor: ${error.message}`)
   return rebuildAccountBalances(accountId, { force: true })
+}
+
+// Bounded on purpose — see BalanceOutlook. One or two billing cycles ahead is
+// the range where card spending is largely known and the number means something.
+export async function getBalanceOutlook(
+  accountId: number,
+  horizonDays = 60,
+): Promise<BalanceOutlook | null> {
+  const db = createFinancesAdminClient()
+  const { data: account } = await db
+    .from('accounts')
+    .select('current_balance, current_balance_date')
+    .eq('id', accountId)
+    .maybeSingle()
+  if (!account || (account as any).current_balance === null) return null
+
+  const today = new Date().toISOString().slice(0, 10)
+  const horizon = new Date()
+  horizon.setDate(horizon.getDate() + horizonDays)
+  const horizonEnd = horizon.toISOString().slice(0, 10)
+
+  const rows = await getAccountBalances(accountId, { from: today, to: horizonEnd })
+
+  const low = rows.length > 0
+    ? rows.reduce((m, r) => (r.closing_balance < m.closing_balance ? r : m), rows[0])
+    : null
+
+  // getAccountBalances returns newest first.
+  const endOfHorizon = rows.length > 0
+    ? rows[0].closing_balance
+    : Number((account as any).current_balance)
+
+  return {
+    current: Number((account as any).current_balance),
+    currentDate: (account as any).current_balance_date,
+    horizonEnd,
+    low: low ? { date: low.date, balance: low.closing_balance } : null,
+    endOfHorizon,
+  }
 }

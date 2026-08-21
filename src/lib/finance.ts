@@ -1,6 +1,6 @@
 import { createFinancesAdminClient } from './supabase/admin'
 import { getOrCreatePeriod } from './billing'
-import { rebuildAllAccountBalances } from './balances'
+import { rebuildAllAccountBalances, getBalanceOutlook } from './balances'
 import type { CategoryKind, Transaction, TransactionAllocation, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, Account } from '../types/finance'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -214,6 +214,15 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     .sort((a, b) => b.ceiling - a.ceiling)
 
   // ── cards ─────────────────────────────────────────────────────────────────
+  // Bank accounts show a balance instead of a spend bar, so resolve each one's
+  // outlook before building the cards.
+  const bankAccountIds = [...new Set(
+    cyclesData.filter((c: any) => c.account.account_type === 'bank_account').map((c: any) => c.account.id as number),
+  )]
+  const outlooks = new Map(
+    await Promise.all(bankAccountIds.map(async (id) => [id, await getBalanceOutlook(id)] as const)),
+  )
+
   const cards: CardData[] = cyclesData.map((cycle: any) => {
     const { id: accountId, payment_method, credit_limit, account_type, funding_account_id } = cycle.account
     const cycleTxs = spendTxs.filter(t => t.billing_cycle_id === cycle.id)
@@ -232,6 +241,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
       cycleStartDate: cycle.start_date as string,
       cycleEndDate: cycle.end_date as string,
       fundingAccountId: funding_account_id ?? null,
+      balance: outlooks.get(accountId) ?? null,
     }
   })
 

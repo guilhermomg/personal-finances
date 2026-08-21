@@ -8,7 +8,7 @@ import { formatCurrency, formatPct, barColor } from '../lib/format'
 import type { CardData } from '../types/finance'
 import { ProgressBar, type BarColor } from './ProgressBar'
 
-export function CardSummary({ name, spent, projected, closeDate, month, accountId, cycleId, totalPaid, creditLimit, accountType, cycleStartDate, cycleEndDate }: CardData & { month?: string }) {
+export function CardSummary({ name, spent, projected, closeDate, month, accountId, cycleId, totalPaid, creditLimit, accountType, cycleStartDate, cycleEndDate, balance }: CardData & { month?: string }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -70,6 +70,58 @@ export function CardSummary({ name, spent, projected, closeDate, month, accountI
       {creditLimit != null ? formatCurrency(creditLimit) : 'set limit'}
     </span>
   )
+
+  // A bank account's headline figure is what is in it, not what has been spent
+  // from it. The low point matters more than the balance: today's number looks
+  // healthy right up until a card comes due.
+  if (accountType === 'bank_account' && balance) {
+    const low = balance.low
+    const lowIsNegative = low != null && low.balance < 0
+    const dayLabel = (d: string) =>
+      new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+    return (
+      <Link href={`/finances/accounts/${accountId}`} className="card-link">
+        <div className="card">
+          <div className="card-label">{name} · Balance</div>
+          <div className="big-num" style={balance.current < 0 ? { color: 'var(--danger)' } : undefined}>
+            {formatCurrency(balance.current)}
+          </div>
+
+          <div style={{ marginTop: '14px', fontSize: '11px', color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {low && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Low point · {dayLabel(low.date)}</span>
+                <span style={{ color: lowIsNegative ? 'var(--danger)' : 'var(--accent2)', fontWeight: 600 }}>
+                  {formatCurrency(low.balance)}
+                </span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>By {dayLabel(balance.horizonEnd)}</span>
+              <span style={{ color: balance.endOfHorizon < 0 ? 'var(--danger)' : 'var(--text)' }}>
+                {formatCurrency(balance.endOfHorizon)}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+              <span>Spent this cycle</span>
+              <span>{formatCurrency(spent)}</span>
+            </div>
+          </div>
+
+          {lowIsNegative && (
+            <div style={{
+              marginTop: '12px', padding: '8px 10px', borderRadius: '6px',
+              background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.3)',
+              fontSize: '11px', color: 'var(--danger)', lineHeight: 1.4,
+            }}>
+              Projected to go negative on {dayLabel(low!.date)}. Upcoming card payments exceed the balance.
+            </div>
+          )}
+        </div>
+      </Link>
+    )
+  }
 
   return (
     <Link href={`/finances/transactions?${params}`} className="card-link">

@@ -52,6 +52,22 @@ export type AccountBalance = {
   closing_balance: number
 }
 
+// A bounded view of where an account is heading.
+//
+// Deliberately bounded: the full series runs years out, but future billing
+// cycles contain only *known* charges — recurring templates and installments —
+// while income projects in full. The further out you look the more optimistic it
+// gets, so a headline projection would read like savings that do not exist.
+export type BalanceOutlook = {
+  current: number
+  currentDate: string
+  horizonEnd: string
+  // Lowest closing balance between today and the horizon — the number that
+  // answers "am I going to run out?", which a current balance alone hides.
+  low: { date: string; balance: number } | null
+  endOfHorizon: number
+}
+
 // Where a balance series starts, or is re-anchored to the real bank figure.
 export type BalanceAnchor = {
   id: number
@@ -92,6 +108,9 @@ export type CardData = {
   cycleEndDate: string    // YYYY-MM-DD — actual billing cycle end
   // For credit cards: the bank account this card is normally paid from.
   fundingAccountId: number | null
+  // Bank accounts only: current balance and where it is heading. null when the
+  // account has no anchor yet, in which case the card falls back to spend-only.
+  balance: BalanceOutlook | null
 }
 
 export type TransactionRow = {

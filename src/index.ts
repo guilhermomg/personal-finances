@@ -28,3 +28,4 @@ export { TransactionsClient } from './components/transactions/TransactionsClient
 // Pages
 export { default as FinancesPage } from './pages/FinancesPage'
 export { default as TransactionsPage } from './pages/TransactionsPage'
+export { default as AccountBalancesPage } from './pages/AccountBalancesPage'
