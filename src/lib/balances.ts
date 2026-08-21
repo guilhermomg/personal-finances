@@ -31,34 +31,91 @@ type SourceRow = {
 //
 // Covers id, date, amount and type, so a re-dated transaction (same amount) and
 // a type change (same amount and date) both register.
-function digestOf(rows: SourceRow[]): string {
-  const canonical = rows
-    .map(r => `${r.id}:${r.date}:${Number(r.amount).toFixed(2)}:${r.transaction_type}`)
-    .sort()
-    .join('|')
+function digestOf(rows: SourceRow[], events: BalanceEvent[] = []): string {
+  const canonical = [
+    ...rows.map(r => `${r.id}:${r.date}:${Number(r.amount).toFixed(2)}:${r.transaction_type}`),
+    ...events.map(e => `evt:${e.date}:${e.inflow.toFixed(2)}:${e.outflow.toFixed(2)}`),
+  ].sort().join('|')
   return createHash('sha256').update(canonical).digest('hex').slice(0, 32)
-}
-
-type DailyTotals = { date: string; inflow: number; outflow: number }
-
-// Collapse transactions into one inflow/outflow pair per date. Exported for
-// tests: this is the arithmetic worth pinning down, and it needs no database.
-export function dailyTotals(rows: SourceRow[]): DailyTotals[] {
-  const byDate = new Map<string, DailyTotals>()
-  for (const r of rows) {
-    const day = byDate.get(r.date) ?? { date: r.date, inflow: 0, outflow: 0 }
-    const amount = Number(r.amount)
-    if (INFLOW_TYPES.includes(r.transaction_type)) day.inflow += amount
-    else if (OUTFLOW_TYPES.includes(r.transaction_type)) day.outflow += amount
-    byDate.set(r.date, day)
-  }
-  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
 // Round to cents at every step. Accumulating floats and rounding only at the end
 // lets sub-cent error ride along in the running balance and eventually trip the
 // account_balances_arithmetic check constraint.
 const cents = (n: number) => Math.round(n * 100) / 100
+
+type DailyTotals = { date: string; inflow: number; outflow: number }
+
+// One money movement feeding the balance series: a transaction, a recorded card
+// payment, or a projected card payment.
+export type BalanceEvent = { date: string; inflow: number; outflow: number }
+
+// Credit-card payments leave the chequing account but are not transactions — they
+// live in billing_cycle_payments, and in practice are rarely recorded at all. So
+// each cycle contributes:
+//
+//   • every recorded payment, on the date it was actually made; plus
+//   • the still-unpaid remainder, projected on the cycle's due_date.
+//
+// Paying a card in full ahead of the due date therefore moves the outflow to the
+// real date and leaves no projection behind; a partial payment leaves only the
+// shortfall on the due date. Cycles due before the anchor are skipped — they are
+// already reflected in the anchored balance — as are payments made before it.
+export function cardPaymentEvents(
+  cycles: {
+    due_date: string | null
+    cycle_total: number
+    payments: { payment_date: string; amount: number }[]
+  }[],
+  anchorDate: string,
+): BalanceEvent[] {
+  const events: BalanceEvent[] = []
+
+  for (const cycle of cycles) {
+    for (const p of cycle.payments) {
+      if (p.payment_date >= anchorDate) {
+        events.push({ date: p.payment_date, inflow: 0, outflow: cents(p.amount) })
+      }
+    }
+
+    // A net-refund cycle owes nothing, so it never projects an outflow.
+    const owed = cents(Math.max(0, cycle.cycle_total))
+    const paid = cents(cycle.payments.reduce((s, p) => s + p.amount, 0))
+    const remainder = cents(Math.max(0, owed - paid))
+
+    if (remainder > 0 && cycle.due_date && cycle.due_date >= anchorDate) {
+      events.push({ date: cycle.due_date, inflow: 0, outflow: remainder })
+    }
+  }
+
+  return events
+}
+
+// Collapse transactions into one inflow/outflow pair per date. Exported for
+// tests: this is the arithmetic worth pinning down, and it needs no database.
+export function dailyTotals(rows: SourceRow[], events: BalanceEvent[] = []): DailyTotals[] {
+  const byDate = new Map<string, DailyTotals>()
+  const dayFor = (date: string) => {
+    const day = byDate.get(date) ?? { date, inflow: 0, outflow: 0 }
+    byDate.set(date, day)
+    return day
+  }
+
+  for (const r of rows) {
+    const day = dayFor(r.date)
+    const amount = Number(r.amount)
+    if (INFLOW_TYPES.includes(r.transaction_type)) day.inflow += amount
+    else if (OUTFLOW_TYPES.includes(r.transaction_type)) day.outflow += amount
+  }
+
+  for (const e of events) {
+    const day = dayFor(e.date)
+    day.inflow += e.inflow
+    day.outflow += e.outflow
+  }
+
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
 
 // Walk the daily totals forward from the anchor, producing one balance row per
 // active date. Pure arithmetic — exported so tests can drive it directly.
@@ -96,6 +153,61 @@ async function latestAnchor(accountId: number): Promise<BalanceAnchor | null> {
     .maybeSingle()
   if (!data) return null
   return { ...(data as any), balance: Number((data as any).balance) } as BalanceAnchor
+}
+
+// Everything the cards funded by this account will take out of it: recorded
+// payments and projected remainders. Returns [] when no card points here.
+async function cardPaymentEventsFor(accountId: number, anchorDate: string): Promise<BalanceEvent[]> {
+  const db = createFinancesAdminClient()
+
+  const { data: cards } = await db
+    .from('accounts')
+    .select('id')
+    .eq('funding_account_id', accountId)
+    .eq('account_type', 'credit_card')
+  const cardIds = ((cards ?? []) as { id: number }[]).map(c => c.id)
+  if (cardIds.length === 0) return []
+
+  // Only cycles that can still cost money after the anchor.
+  const { data: cycleRows } = await db
+    .from('billing_cycles')
+    .select('id, due_date')
+    .in('account_id', cardIds)
+    .gte('due_date', anchorDate)
+  const cycles = (cycleRows ?? []) as { id: number; due_date: string | null }[]
+  if (cycles.length === 0) return []
+
+  const cycleIds = cycles.map(c => c.id)
+
+  const [{ data: txRows }, { data: payRows }] = await Promise.all([
+    db.from('transactions').select('billing_cycle_id, amount, transaction_type').in('billing_cycle_id', cycleIds),
+    db.from('billing_cycle_payments').select('billing_cycle_id, amount, payment_date').in('billing_cycle_id', cycleIds),
+  ])
+
+  // What each cycle owes: charges less refunds and cashback.
+  const owedByCycle = new Map<number, number>()
+  for (const t of (txRows ?? []) as any[]) {
+    const signed = t.transaction_type === 'expense' ? Number(t.amount)
+      : ['refund', 'cashback'].includes(t.transaction_type) ? -Number(t.amount)
+      : 0
+    owedByCycle.set(t.billing_cycle_id, (owedByCycle.get(t.billing_cycle_id) ?? 0) + signed)
+  }
+
+  const paymentsByCycle = new Map<number, { payment_date: string; amount: number }[]>()
+  for (const p of (payRows ?? []) as any[]) {
+    const list = paymentsByCycle.get(p.billing_cycle_id) ?? []
+    list.push({ payment_date: p.payment_date, amount: Number(p.amount) })
+    paymentsByCycle.set(p.billing_cycle_id, list)
+  }
+
+  return cardPaymentEvents(
+    cycles.map(c => ({
+      due_date: c.due_date,
+      cycle_total: owedByCycle.get(c.id) ?? 0,
+      payments: paymentsByCycle.get(c.id) ?? [],
+    })),
+    anchorDate,
+  )
 }
 
 export type RebuildResult =
@@ -139,10 +251,15 @@ export async function rebuildAccountBalances(
     .gte('date', anchor.as_of_date)
   const rows = (txRows ?? []) as SourceRow[]
 
-  const digest = digestOf(rows)
+  const events = await cardPaymentEventsFor(accountId, anchor.as_of_date)
+
+  // The digest must cover the card-payment side too, or a new charge on a card
+  // (which changes what the cycle will cost this account) would not invalidate
+  // the cache.
+  const digest = digestOf(rows, events)
   if (!force && digest === acct.balances_digest) return { status: 'unchanged' }
 
-  const balances = runningBalances(anchor.balance, dailyTotals(rows))
+  const balances = runningBalances(anchor.balance, dailyTotals(rows, events))
 
   // Replace wholesale rather than diffing: the rebuild is the unit of work, and
   // a partial application is the one state that would leave balances wrong.

@@ -152,7 +152,7 @@ export default async function FinancesPage({
         accounts={accounts}
         creditCards={data.cards
           .filter(c => c.accountType === 'credit_card')
-          .map(c => ({ name: c.name, cycleId: c.cycleId }))}
+          .map(c => ({ name: c.name, cycleId: c.cycleId, fundingAccountId: c.fundingAccountId }))}
       />
     </>
   )

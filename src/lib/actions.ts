@@ -232,17 +232,37 @@ export async function updateRecurringTransaction(id: number, data: RecurringUpda
   await rebuildAllAccountBalances()
 }
 
+// `fundingAccountId` is where the money left from. Defaults to the card's
+// configured funding account, so recording a payment the usual way needs no
+// extra input — and once recorded, the balance series uses the real date and
+// amount instead of the due-date projection.
 export async function addBillingCyclePayment(
   cycleId: number,
   amount: number,
   paymentDate: string,
   notes: string | null,
+  fundingAccountId?: number | null,
 ) {
   const db = createFinancesAdminClient()
+
+  let funding = fundingAccountId ?? null
+  if (funding === null) {
+    const { data } = await db
+      .from('billing_cycles')
+      .select('account:accounts!billing_cycles_account_id_fkey(funding_account_id)')
+      .eq('id', cycleId)
+      .maybeSingle()
+    funding = (data as any)?.account?.funding_account_id ?? null
+  }
+
   const { error } = await db
     .from('billing_cycle_payments')
-    .insert({ billing_cycle_id: cycleId, amount, payment_date: paymentDate, notes, user_id: ownerUserId() })
+    .insert({
+      billing_cycle_id: cycleId, amount, payment_date: paymentDate, notes,
+      funding_account_id: funding, user_id: ownerUserId(),
+    })
   if (error) throw new Error(error.message)
+  await rebuildAllAccountBalances()
 }
 
 export async function updateTransaction(id: number, data: TransactionData) {

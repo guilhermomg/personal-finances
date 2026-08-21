@@ -3,14 +3,19 @@
 import { useImperativeHandle, useState } from 'react'
 import { inputStyle, labelStyle } from './transaction-utils'
 import { AmountInput } from './AmountInput'
+import type { Account } from '../../types/finance'
 
-export type PaymentCard = { name: string; cycleId: number }
+export type PaymentCard = { name: string; cycleId: number; fundingAccountId: number | null }
 
 export type PaymentFormValues = {
   cycleId: number
   amount: number
   paymentDate: string
   notes: string | null
+  // Which account the money left. Recording this is what lets the payment show
+  // up as a real outflow on the funding account's balance, on its actual date,
+  // instead of the estimate projected on the cycle's due date.
+  fundingAccountId: number | null
 }
 
 export type PaymentFormHandle = {
@@ -20,17 +25,20 @@ export type PaymentFormHandle = {
 type Props = {
   ref?: React.Ref<PaymentFormHandle>
   creditCards: PaymentCard[]
+  accounts: Account[]
 }
 
-export function PaymentForm({ ref, creditCards }: Props) {
+export function PaymentForm({ ref, creditCards, accounts }: Props) {
   const todayStr = new Date().toISOString().split('T')[0]
   const initCard = creditCards[0]
+  const bankAccounts = accounts.filter(a => a.account_type === 'bank_account')
 
   const [form, setForm] = useState({
     cycleId: initCard?.cycleId ?? 0,
     amount: '0.00',
     paymentDate: todayStr,
     notes: '',
+    fundingAccountId: initCard?.fundingAccountId ?? bankAccounts[0]?.id ?? 0,
   })
 
   useImperativeHandle(ref, () => ({
@@ -43,14 +51,23 @@ export function PaymentForm({ ref, creditCards }: Props) {
         amount,
         paymentDate: form.paymentDate,
         notes: form.notes.trim() || null,
+        fundingAccountId: form.fundingAccountId || null,
       }
     },
   }), [form])
 
   function set(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const value = field === 'cycleId' ? Number(e.target.value) : e.target.value
-      setForm(prev => ({ ...prev, [field]: value }))
+      const value = field === 'cycleId' || field === 'fundingAccountId'
+        ? Number(e.target.value) : e.target.value
+      setForm(prev => {
+        const next = { ...prev, [field]: value }
+        if (field === 'cycleId') {
+          const card = creditCards.find(c => c.cycleId === value)
+          next.fundingAccountId = card?.fundingAccountId ?? prev.fundingAccountId
+        }
+        return next
+      })
     }
   }
 
@@ -74,6 +91,15 @@ export function PaymentForm({ ref, creditCards }: Props) {
         >
           {creditCards.map(c => (
             <option key={c.cycleId} value={c.cycleId}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label style={labelStyle}>Paid from</label>
+        <select style={inputStyle} value={form.fundingAccountId} onChange={set('fundingAccountId')}>
+          {bankAccounts.map(a => (
+            <option key={a.id} value={a.id}>{a.payment_method}</option>
           ))}
         </select>
       </div>

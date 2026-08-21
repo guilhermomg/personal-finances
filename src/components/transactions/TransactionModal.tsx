@@ -75,7 +75,9 @@ export function TransactionModal({ transaction, allCategories, incomeCategories,
       } else {
         const result = paymentRef.current?.getValues()
         if (!result) { setError('Please select a card and fill in a valid amount'); setSaving(false); return }
-        await addBillingCyclePayment(result.cycleId, result.amount, result.paymentDate, result.notes)
+        await addBillingCyclePayment(
+          result.cycleId, result.amount, result.paymentDate, result.notes, result.fundingAccountId,
+        )
       }
       router.refresh()
       onClose()
@@ -214,6 +216,7 @@ export function TransactionModal({ transaction, allCategories, incomeCategories,
             <PaymentForm
               ref={paymentRef}
               creditCards={creditCards}
+              accounts={accounts}
             />
           )}
         </div>

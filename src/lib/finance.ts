@@ -148,7 +148,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   // Billing cycles for this period, joined with their card config
   const { data: cyclesData, error: cyclesError } = await db
     .from('billing_cycles')
-    .select('id, start_date, end_date, due_date, status, account:accounts(id, name, payment_method, credit_limit, account_type)')
+    .select('id, start_date, end_date, due_date, status, account:accounts(id, name, payment_method, credit_limit, account_type, funding_account_id)')
     .eq('billing_period_id', currentPeriod.id)
 
   if (cyclesError || !cyclesData || cyclesData.length === 0) return null
@@ -215,7 +215,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
 
   // ── cards ─────────────────────────────────────────────────────────────────
   const cards: CardData[] = cyclesData.map((cycle: any) => {
-    const { id: accountId, payment_method, credit_limit, account_type } = cycle.account
+    const { id: accountId, payment_method, credit_limit, account_type, funding_account_id } = cycle.account
     const cycleTxs = spendTxs.filter(t => t.billing_cycle_id === cycle.id)
     const projected = cycleTxs.reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
     const spent = cycleTxs.filter(t => t.date <= todayStr).reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
@@ -231,6 +231,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
       accountType: account_type as 'credit_card' | 'bank_account',
       cycleStartDate: cycle.start_date as string,
       cycleEndDate: cycle.end_date as string,
+      fundingAccountId: funding_account_id ?? null,
     }
   })
 

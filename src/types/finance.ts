@@ -90,6 +90,8 @@ export type CardData = {
   accountType: 'credit_card' | 'bank_account'
   cycleStartDate: string  // YYYY-MM-DD — actual billing cycle start
   cycleEndDate: string    // YYYY-MM-DD — actual billing cycle end
+  // For credit cards: the bank account this card is normally paid from.
+  fundingAccountId: number | null
 }
 
 export type TransactionRow = {
