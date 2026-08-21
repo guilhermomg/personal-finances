@@ -1,8 +1,8 @@
 'use server'
 
 import { createFinancesAdminClient, ownerUserId } from './supabase/admin'
-import { getOrCreateCycleForTransaction, getOrCreateCycleByStatementDate } from './billing'
-import { rebuildAllAccountBalances } from './balances'
+import { getOrCreateCycleForTransaction, getOrCreateCycleByStatementDate, getOrCreatePeriod } from './billing'
+import { rebuildAllAccountBalances, setBalanceAnchor } from './balances'
 import type { CategoryKind, TransactionAllocation, TransactionType } from '../types/finance'
 
 type TransactionData = {
@@ -122,6 +122,90 @@ export async function upsertBudgetForward(fromPeriodId: number, category: string
     )
     if (error) throw new Error(error.message)
   }
+}
+
+type NewAccountData = {
+  name: string
+  accountType: 'credit_card' | 'bank_account'
+  // Day of the month the cycle opens. Constrained to 2-28 by the form: the
+  // cycle's end day is derived as cycleStartDay - 1 in the *following* month, so
+  // day 1 would need a day-0 end, and days 29-31 would produce invalid dates in
+  // short months.
+  cycleStartDay: number
+  paymentDueDay: number | null
+  creditLimit: number | null
+  fundingAccountId: number | null
+  // Bank accounts only — where balance tracking starts.
+  initialBalance: number | null
+  initialBalanceDate: string | null
+}
+
+// Creates an account and, for a bank account, its first balance anchor. The
+// anchor is what switches balance tracking on: without one, rebuilds skip the
+// account entirely.
+export async function addAccount(data: NewAccountData): Promise<{ id: number }> {
+  const db = createFinancesAdminClient()
+
+  // cycle_end_day is start - 1 in the following month, so day 1 would need a
+  // day-0 end and days 29-31 do not exist in every month.
+  if (data.cycleStartDay < 2 || data.cycleStartDay > 28) {
+    throw new Error('Cycle start day must be between 2 and 28')
+  }
+
+  const { data: inserted, error } = await db
+    .from('accounts')
+    .insert({
+      name: data.name,
+      payment_method: data.name,
+      account_type: data.accountType,
+      cycle_start_day: data.cycleStartDay,
+      cycle_end_day: data.cycleStartDay - 1,
+      payment_due_day: data.accountType === 'credit_card' ? data.paymentDueDay : null,
+      credit_limit: data.accountType === 'credit_card' ? data.creditLimit : null,
+      funding_account_id: data.accountType === 'credit_card' ? data.fundingAccountId : null,
+      active: true,
+      user_id: ownerUserId(),
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') throw new Error(`An account named "${data.name}" already exists`)
+    throw new Error(error.message)
+  }
+  const accountId = (inserted as { id: number }).id
+
+  if (data.initialBalanceDate && data.initialBalanceDate > new Date().toISOString().slice(0, 10)) {
+    throw new Error('Starting balance date cannot be in the future')
+  }
+
+  if (data.accountType === 'bank_account' && data.initialBalance !== null && data.initialBalanceDate) {
+    await setBalanceAnchor(accountId, data.initialBalanceDate, data.initialBalance, 'Initial balance')
+  }
+
+  // Give the new account a cycle in the current period so it appears right away;
+  // other periods get theirs as they are visited.
+  await getOrCreatePeriod(new Date().toISOString().slice(0, 7))
+
+  return { id: accountId }
+}
+
+// Re-anchor an account to its real bank balance. Real accounts drift — fees,
+// interest, transactions never recorded — and without this the error compounds
+// forever. A later anchor supersedes earlier ones without rewriting history.
+export async function reconcileAccountBalance(
+  accountId: number,
+  asOfDate: string,
+  balance: number,
+  note: string | null = null,
+) {
+  // Reconciliation means "this is what the bank says right now", so a future
+  // date is always a mistake — and one that would otherwise sit inert until it
+  // arrived, then silently rewrite the balance.
+  if (asOfDate > new Date().toISOString().slice(0, 10)) {
+    throw new Error('Balance date cannot be in the future')
+  }
+  await setBalanceAnchor(accountId, asOfDate, balance, note ?? 'Reconciled')
 }
 
 export async function updateCreditLimit(accountId: number, amount: number | null) {

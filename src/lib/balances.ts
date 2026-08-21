@@ -148,6 +148,10 @@ async function latestAnchor(accountId: number): Promise<BalanceAnchor | null> {
     .from('account_balance_anchors')
     .select('id, account_id, as_of_date, balance, note')
     .eq('account_id', accountId)
+    // On or before today. A future-dated anchor must not take effect yet: the
+    // series would start in the future, leaving no row on or before today, and
+    // current_balance would fall back to a balance that has not happened.
+    .lte('as_of_date', new Date().toISOString().slice(0, 10))
     .order('as_of_date', { ascending: false })
     .limit(1)
     .maybeSingle()

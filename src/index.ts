@@ -10,7 +10,9 @@ export * from './lib/supabase/admin'
 export * from './types/finance'
 
 // Components
+export { AddAccountButton } from './components/AddAccountButton'
 export { BillingPeriodSwitcher } from './components/BillingPeriodSwitcher'
+export { ReconcileBalanceButton } from './components/ReconcileBalanceButton'
 export { CardSummary } from './components/CardSummary'
 export { CategoryBreakdown } from './components/CategoryBreakdown'
 export { Chip } from './components/Chip'

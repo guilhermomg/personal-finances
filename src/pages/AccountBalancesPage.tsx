@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getAccountBalances, getBalanceOutlook } from '../lib/balances'
 import { getAccounts } from '../lib/finance'
 import { formatCurrency } from '../lib/format'
+import { ReconcileBalanceButton } from '../components/ReconcileBalanceButton'
 
 function dayLabel(d: string): string {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
@@ -49,10 +50,15 @@ export default async function AccountBalancesPage({
 
   return (
     <>
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
         <Link href="/finances" style={{ color: 'var(--muted)', fontSize: '12px', textDecoration: 'none' }}>
           ← Finances
         </Link>
+        <ReconcileBalanceButton
+          accountId={accountId}
+          accountName={account.payment_method}
+          currentBalance={outlook.current}
+        />
       </div>
 
       <div className="grid grid-3" style={{ marginBottom: '24px' }}>

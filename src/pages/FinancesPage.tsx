@@ -9,6 +9,7 @@ import { FAB } from '../components/FAB'
 import { CumulativeChart } from '../components/CumulativeChart'
 import { CreditUsageCard } from '../components/CreditUsageCard'
 import { AddBudgetButton } from '../components/AddBudgetButton'
+import { AddAccountButton } from '../components/AddAccountButton'
 
 export default async function FinancesPage({
   searchParams,
@@ -80,7 +81,10 @@ export default async function FinancesPage({
       </div>
 
       <div className="page-section">
-        <div className="page-section-title">Cards &amp; Accounts</div>
+        <div className="page-section-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          Cards &amp; Accounts
+          <AddAccountButton bankAccounts={accounts.filter(a => a.account_type === 'bank_account')} />
+        </div>
         <div className="grid grid-3">
           {data.cards.map(card => (
             <CardSummary key={card.name} {...card} month={month as string | undefined} />
