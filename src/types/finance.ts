@@ -158,6 +158,10 @@ export type DashboardData = {
   cards: CardData[]
   recurring: TransactionRow[]
   recurringTotal: number
+  // Income landing in this period (seeded from a recurring template, or entered
+  // by hand). Excluded from every spend figure — see isSpend in lib/finance.
+  income: TransactionRow[]
+  incomeTotal: number
   installments: TransactionRow[]
   installTotal: number
   categories: CategoryData[]

@@ -123,6 +123,20 @@ export default async function FinancesPage({
         />
       </div>
 
+      {data.income.length > 0 && (
+        <div className="page-section">
+          <TransactionTable
+            title="Income"
+            dotColor="#34c759"
+            rows={data.income}
+            total={data.incomeTotal}
+            totalSpent={data.incomeTotal}
+            totalColor="#34c759"
+            paymentStyles={paymentStyles}
+          />
+        </div>
+      )}
+
       <hr className="divider" />
 
       <CategoryBreakdown

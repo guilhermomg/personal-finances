@@ -241,11 +241,14 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   // Filter templates to only those relevant to the current period month.
   // Monthly: always included. Annual (and others): only when start_date's month matches.
   const periodYearMon = `${periodYear}-${periodMon}`
-  const templates = (templatesRes.data ?? []).filter((rt: { frequency: string; start_date: string; deactivated_at: string | null }) => {
+  const templates = (templatesRes.data ?? []).filter((rt: { frequency: string; start_date: string; deactivated_at: string | null; transaction_type?: string }) => {
+    // Income and transfer templates are not spending: including them here would
+    // subtract a salary from the discretionary ceiling.
+    if (rt.transaction_type && rt.transaction_type !== 'expense') return false
     if (rt.deactivated_at && rt.deactivated_at.slice(0, 7) <= periodYearMon) return false
     if (rt.start_date.slice(0, 7) > periodYearMon) return false
-    if (rt.frequency === 'monthly') return true
-    return rt.start_date.slice(5, 7) === periodMon
+    if (rt.frequency === 'annual') return rt.start_date.slice(5, 7) === periodMon
+    return true
   })
   const recurring = templates.map((rt: any) => {
     const actualTx = txs.find(t => t.recurring_transaction_id === rt.id)
@@ -267,6 +270,23 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   })
   recurring.sort((a, b) => a.date.localeCompare(b.date))
   const recurringTotal = recurring.reduce((s, r) => s + r.amount, 0)
+
+  // ── income ────────────────────────────────────────────────────────────────
+  // Read off transactions, not templates: a biweekly salary fires twice in a
+  // period and hand-entered income counts too.
+  const incomeTxs = txs
+    .filter(t => t.transaction_type === 'income')
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const income = incomeTxs.map(t => ({
+    description: t.description,
+    payment_method: t.payment_method,
+    payment_provider: t.payment_provider ?? null,
+    amount: Number(t.amount),
+    date: t.date,
+    category: t.category,
+    transaction_type: t.transaction_type,
+  }))
+  const incomeTotal = income.reduce((s, r) => s + r.amount, 0)
 
   // ── installments ──────────────────────────────────────────────────────────
   const installmentTxs = spendTxs
@@ -359,6 +379,8 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
     cards,
     recurring,
     recurringTotal,
+    income,
+    incomeTotal,
     installments,
     installTotal,
     categories,
