@@ -41,6 +41,26 @@ export type TransactionAllocation = {
   amount: number
 }
 
+// One day of activity on a bank account. Sparse: dates with no transactions
+// have no row, and their balance is the previous row's closing_balance.
+export type AccountBalance = {
+  account_id: number
+  date: string            // YYYY-MM-DD
+  opening_balance: number
+  inflow: number          // income, refunds, cashback — stored positive
+  outflow: number         // expenses, transfers out — stored positive
+  closing_balance: number
+}
+
+// Where a balance series starts, or is re-anchored to the real bank figure.
+export type BalanceAnchor = {
+  id: number
+  account_id: number
+  as_of_date: string
+  balance: number
+  note: string | null
+}
+
 export type ChipStyle = {
   label: string | null
   colorMain: string
@@ -100,10 +120,16 @@ export type CumulativePoint = {
 }
 
 export type Account = {
+  id: number
   payment_method: string
   cycle_start_day: number
   account_type: 'credit_card' | 'bank_account'
   credit_limit: number | null
+  // Cached by rebuildAccountBalances(); null until an account has an anchor.
+  // `current` is as of today, `projected` includes future-dated rows.
+  current_balance: number | null
+  current_balance_date: string | null
+  projected_balance: number | null
 }
 
 export type BillingPeriod = {

@@ -2,6 +2,7 @@
 
 import { createFinancesAdminClient, ownerUserId } from './supabase/admin'
 import { getOrCreateCycleForTransaction, getOrCreateCycleByStatementDate } from './billing'
+import { rebuildAllAccountBalances } from './balances'
 import type { CategoryKind, TransactionAllocation, TransactionType } from '../types/finance'
 
 type TransactionData = {
@@ -64,6 +65,7 @@ export async function addTransaction(data: TransactionData) {
     .single()
   if (error) throw new Error(error.message)
   await reconcileAllocations(db, (inserted as { id: number }).id, categories)
+  await rebuildAllAccountBalances()
 }
 
 export async function upsertBudget(billingPeriodId: number, category: string | null, amount: number) {
@@ -159,6 +161,7 @@ export async function addInstallments(items: InstallmentTransactionData[]) {
   }
   const { error } = await db.from('transactions').insert(rows)
   if (error) throw new Error(error.message)
+  await rebuildAllAccountBalances()
 }
 
 type RecurringUpdateData = {
@@ -183,6 +186,7 @@ export async function deactivateRecurringTransaction(id: number) {
     .eq('recurring_transaction_id', id)
     .gte('date', today)
   if (txError) throw new Error(txError.message)
+  await rebuildAllAccountBalances()
 }
 
 export async function updateRecurringTransaction(id: number, data: RecurringUpdateData) {
@@ -225,6 +229,7 @@ export async function updateRecurringTransaction(id: number, data: RecurringUpda
     user_id: ownerUserId(),
   })
   if (insertError) throw new Error(insertError.message)
+  await rebuildAllAccountBalances()
 }
 
 export async function addBillingCyclePayment(
@@ -252,6 +257,7 @@ export async function updateTransaction(id: number, data: TransactionData) {
     .eq('id', id)
   if (error) throw new Error(error.message)
   await reconcileAllocations(db, id, categories)
+  await rebuildAllAccountBalances()
 }
 
 export async function deleteTransaction(id: number) {
@@ -261,4 +267,5 @@ export async function deleteTransaction(id: number) {
     .delete()
     .eq('id', id)
   if (error) throw new Error(error.message)
+  await rebuildAllAccountBalances()
 }

@@ -3,6 +3,7 @@ export * from './lib/billing'
 export * from './lib/finance'
 export * from './lib/format'
 export * from './lib/actions'
+export * from './lib/balances'
 export * from './lib/supabase/admin'
 
 // Types

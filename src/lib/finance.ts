@@ -1,5 +1,6 @@
 import { createFinancesAdminClient } from './supabase/admin'
 import { getOrCreatePeriod } from './billing'
+import { rebuildAllAccountBalances } from './balances'
 import type { CategoryKind, Transaction, TransactionAllocation, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, Account } from '../types/finance'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -135,6 +136,11 @@ export async function getTransactions(month?: string): Promise<Transaction[]> {
 
 export async function getDashboardData(month?: string): Promise<DashboardData | null> {
   const db = createFinancesAdminClient()
+
+  // Catch writes made outside the app — the /personal-finance skill inserts
+  // transactions as raw SQL and never calls the server actions. The digest check
+  // inside makes this a no-op (one query, no writes) when nothing has changed.
+  await rebuildAllAccountBalances()
 
   const currentPeriod = await resolveCurrentPeriod(month)
   if (!currentPeriod) return null
@@ -391,7 +397,7 @@ export async function getAccounts(): Promise<Account[]> {
   const db = createFinancesAdminClient()
   const { data } = await db
     .from('accounts')
-    .select('payment_method, cycle_start_day, account_type, credit_limit')
+    .select('id, payment_method, cycle_start_day, account_type, credit_limit, current_balance, current_balance_date, projected_balance')
     .eq('active', true)
   return (data ?? []) as Account[]
 }
