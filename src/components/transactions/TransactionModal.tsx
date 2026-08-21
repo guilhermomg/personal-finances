@@ -12,6 +12,7 @@ import { PaymentForm, type PaymentFormHandle, type PaymentCard } from './Payment
 type Props = {
   transaction?: Transaction
   allCategories: string[]
+  incomeCategories: string[]
   allMethods: string[]
   allProviders: string[]
   accounts: Account[]
@@ -21,7 +22,7 @@ type Props = {
 
 type Mode = 'onetime' | 'installments' | 'refund' | 'payment'
 
-export function TransactionModal({ transaction, allCategories, allMethods, allProviders, accounts, creditCards = [], onClose }: Props) {
+export function TransactionModal({ transaction, allCategories, incomeCategories, allMethods, allProviders, accounts, creditCards = [], onClose }: Props) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,7 +70,7 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
         const result = refundRef.current?.getValues()
         if (!result) { setError('Please fill in a valid amount'); setSaving(false); return }
         const { data, newCategoryToAdd } = result
-        if (newCategoryToAdd) await addCategory(newCategoryToAdd)
+        if (newCategoryToAdd) await addCategory(newCategoryToAdd.name, newCategoryToAdd.kind)
         await addTransaction(data)
       } else {
         const result = paymentRef.current?.getValues()
@@ -173,7 +174,7 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
               Installments
             </button>
             <button style={mode === 'refund' ? tabActive : tabBase} onClick={() => setMode('refund')}>
-              Refund / CB
+              Money In
             </button>
             {creditCards.length > 0 && (
               <button style={mode === 'payment' ? tabActive : tabBase} onClick={() => setMode('payment')}>
@@ -205,6 +206,7 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
             <RefundCashbackForm
               ref={refundRef}
               allCategories={allCategories}
+              incomeCategories={incomeCategories}
               allMethods={allMethods}
               accounts={accounts}
             />
@@ -268,7 +270,7 @@ export function TransactionModal({ transaction, allCategories, allMethods, allPr
                 padding: '8px 20px',
               }}
             >
-              {saving ? 'Saving…' : !isNew ? 'Save' : mode === 'installments' ? 'Add Installments' : mode === 'refund' ? 'Add Credit' : mode === 'payment' ? 'Add Payment' : 'Add'}
+              {saving ? 'Saving…' : !isNew ? 'Save' : mode === 'installments' ? 'Add Installments' : mode === 'refund' ? 'Add Money In' : mode === 'payment' ? 'Add Payment' : 'Add'}
             </button>
             </div>
           </div>

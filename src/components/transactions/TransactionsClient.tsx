@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Chip } from '../Chip'
 import { chipProps } from '../chipUtils'
-import { formatCurrency } from '../../lib/format'
+import { formatCurrency, txDisplaySign, txTypeLabel, txIsCredit } from '../../lib/format'
 import { MultiSelect } from './MultiSelect'
 import { DateBillingFilterDropdown } from './DateBillingFilterDropdown'
 import { type FilterMode } from './DateBillingFilter'
@@ -52,7 +52,7 @@ function loadSavedWhenFilter(): SavedWhenFilter | null {
   }
 }
 
-export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, initialWhenFromUrl, accounts, allCategories, paymentStyles }: {
+export function TransactionsClient({ transactions, billingPeriods, initialPeriodId, initialDateFrom, initialDateTo, initialWhenFromUrl, accounts, allCategories, incomeCategories, paymentStyles }: {
   transactions: Transaction[]
   billingPeriods: BillingPeriodOption[]
   initialPeriodId: number | null
@@ -62,6 +62,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
   initialWhenFromUrl: boolean
   accounts: Account[]
   allCategories: string[]
+  incomeCategories: string[]
   paymentStyles: PaymentStyleMap
 }) {
   const searchParams = useSearchParams()
@@ -355,8 +356,8 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                     )}
                   </td>
                   <td style={{ color: 'var(--muted)', fontSize: '12px', whiteSpace: 'nowrap' }}>{t.category}<SplitBadge t={t} /></td>
-                  <td className="td-amt" style={t.transaction_type !== 'expense' ? { color: '#34c759' } : undefined}>
-                    {formatCurrency((t.transaction_type === 'expense' ? 1 : -1) * Number(t.amount))}
+                  <td className="td-amt" style={txIsCredit(t.transaction_type) ? { color: '#34c759' } : undefined}>
+                    {formatCurrency(txDisplaySign(t.transaction_type) * Number(t.amount))}
                   </td>
                   <td style={{ whiteSpace: 'nowrap', paddingLeft: '12px' }}>
                     <Chip {...chipProps(paymentStyles, t.payment_method)} />
@@ -367,19 +368,19 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                     )}
                   </td>
                   <td>
-                    {t.transaction_type !== 'expense' ? (
+                    {txTypeLabel(t.transaction_type) ? (
                       <span style={{
                         fontSize: '9px',
                         padding: '1px 6px',
                         borderRadius: '99px',
                         fontWeight: 500,
                         letterSpacing: '0.5px',
-                        background: 'rgba(52,199,89,0.15)',
-                        color: '#34c759',
-                        border: '1px solid rgba(52,199,89,0.3)',
+                        background: txIsCredit(t.transaction_type) ? 'rgba(52,199,89,0.15)' : 'var(--surface2)',
+                        color: txIsCredit(t.transaction_type) ? '#34c759' : 'var(--muted)',
+                        border: txIsCredit(t.transaction_type) ? '1px solid rgba(52,199,89,0.3)' : '1px solid var(--border)',
                         whiteSpace: 'nowrap',
                       }}>
-                        {t.transaction_type === 'cashback' ? 'Cashback' : 'Refund'}
+                        {txTypeLabel(t.transaction_type)}
                       </span>
                     ) : t.recurring_transaction_id !== null ? (
                       <span style={{ fontSize: '10px', color: 'var(--accent2)', letterSpacing: '0.5px' }}>
@@ -396,7 +397,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
               <tr className="table-foot">
                 <td colSpan={3}>Total</td>
                 <td className="td-amt">
-                  {formatCurrency(filtered.reduce((s, t) => s + (t.transaction_type === 'expense' ? 1 : -1) * Number(t.amount), 0))}
+                  {formatCurrency(filtered.reduce((s, t) => s + txDisplaySign(t.transaction_type) * Number(t.amount), 0))}
                 </td>
                 <td colSpan={3} />
               </tr>
@@ -433,8 +434,8 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                         <span style={{ color: 'var(--muted)', fontSize: '11px' }}> ({t.installment_number}/{t.installment_total})</span>
                       )}
                     </span>
-                    <span className="tx-list-amount" style={t.transaction_type !== 'expense' ? { color: '#34c759' } : undefined}>
-                      {formatCurrency((t.transaction_type === 'expense' ? 1 : -1) * Number(t.amount))}
+                    <span className="tx-list-amount" style={txIsCredit(t.transaction_type) ? { color: '#34c759' } : undefined}>
+                      {formatCurrency(txDisplaySign(t.transaction_type) * Number(t.amount))}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
@@ -442,18 +443,18 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
                     {t.payment_provider && (
                       <Chip {...chipProps(paymentStyles, t.payment_provider)} />
                     )}
-                    {t.transaction_type !== 'expense' && (
+                    {txTypeLabel(t.transaction_type) && (
                       <span style={{
                         fontSize: '9px',
                         padding: '1px 6px',
                         borderRadius: '99px',
                         fontWeight: 500,
                         letterSpacing: '0.5px',
-                        background: 'rgba(52,199,89,0.15)',
-                        color: '#34c759',
-                        border: '1px solid rgba(52,199,89,0.3)',
+                        background: txIsCredit(t.transaction_type) ? 'rgba(52,199,89,0.15)' : 'var(--surface2)',
+                        color: txIsCredit(t.transaction_type) ? '#34c759' : 'var(--muted)',
+                        border: txIsCredit(t.transaction_type) ? '1px solid rgba(52,199,89,0.3)' : '1px solid var(--border)',
                       }}>
-                        {t.transaction_type === 'cashback' ? 'Cashback' : 'Refund'}
+                        {txTypeLabel(t.transaction_type)}
                       </span>
                     )}
                     <span className="tx-list-sub" style={{ marginTop: 0 }}>· {t.category}<SplitBadge t={t} /></span>
@@ -469,7 +470,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
           ))}
           <div className="tx-list-footer">
             <span>Total</span>
-            <span>{formatCurrency(filtered.reduce((s, t) => s + (t.transaction_type === 'expense' ? 1 : -1) * Number(t.amount), 0))}</span>
+            <span>{formatCurrency(filtered.reduce((s, t) => s + txDisplaySign(t.transaction_type) * Number(t.amount), 0))}</span>
           </div>
         </div>
 
@@ -495,6 +496,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
           <TransactionModal
             transaction={editingTransaction}
             allCategories={allCategories}
+            incomeCategories={incomeCategories}
             allMethods={allMethods}
             allProviders={allProviders}
             accounts={accounts}
@@ -502,7 +504,7 @@ export function TransactionsClient({ transactions, billingPeriods, initialPeriod
           />
         )
       )}
-      <FAB allCategories={allCategories} allMethods={allMethods} allProviders={allProviders} accounts={accounts} />
+      <FAB allCategories={allCategories} incomeCategories={incomeCategories} allMethods={allMethods} allProviders={allProviders} accounts={accounts} />
     </>
   )
 }

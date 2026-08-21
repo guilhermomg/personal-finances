@@ -1,7 +1,7 @@
 'use client'
 
 import { useImperativeHandle, useState } from 'react'
-import type { Account } from '../../types/finance'
+import type { Account, CategoryKind } from '../../types/finance'
 import {
   isCreditCard,
   getBillingCycleOptions,
@@ -11,6 +11,22 @@ import {
 } from './transaction-utils'
 import { AmountInput } from './AmountInput'
 
+// Refund and cashback offset spending; income is new money arriving. All three
+// are "money in" from the form's point of view, which is why they share it —
+// but only income is excluded from spend totals (see isSpend in lib/finance).
+export type MoneyInType = 'refund' | 'cashback' | 'income'
+
+// Cashback is the one type whose category is pinned rather than chosen.
+const FIXED_CATEGORY: Partial<Record<MoneyInType, string>> = {
+  cashback: 'Cashback',
+}
+
+// Income is classified with income categories (Salary, Interest, Gift…);
+// refunds are classified with the expense categories they offset.
+function categoryKindFor(type: MoneyInType): CategoryKind {
+  return type === 'income' ? 'income' : 'expense'
+}
+
 export type RefundCashbackFormData = {
   description: string
   date: string
@@ -19,26 +35,30 @@ export type RefundCashbackFormData = {
   amount: number
   notes: string | null
   statement_date: string | null
-  transaction_type: 'refund' | 'cashback'
+  transaction_type: 'refund' | 'cashback' | 'income'
   refund_for_transaction_id: null
 }
 
 export type RefundCashbackFormHandle = {
-  getValues(): { data: RefundCashbackFormData; newCategoryToAdd: string | null } | null
+  getValues(): {
+    data: RefundCashbackFormData
+    newCategoryToAdd: { name: string; kind: CategoryKind } | null
+  } | null
 }
 
 type Props = {
   ref?: React.Ref<RefundCashbackFormHandle>
   allCategories: string[]
+  incomeCategories: string[]
   allMethods: string[]
   accounts: Account[]
 }
 
-export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }: Props) {
+export function RefundCashbackForm({ ref, allCategories, incomeCategories, allMethods, accounts }: Props) {
   const todayStr = new Date().toISOString().split('T')[0]
   const initPm = allMethods[0] ?? ''
 
-  const [type, setType] = useState<'refund' | 'cashback'>('refund')
+  const [type, setType] = useState<MoneyInType>('refund')
   const [newCategoryMode, setNewCategoryMode] = useState(false)
   const [form, setForm] = useState({
     description: '',
@@ -52,15 +72,19 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
       : '',
   })
 
+  // Options for the category picker, per active tab.
+  const categoryOptions = type === 'income' ? incomeCategories : allCategories
+
   useImperativeHandle(ref, () => ({
     getValues() {
       const amount = parseFloat(form.amount)
       if (isNaN(amount) || amount <= 0) return null
-      const category = type === 'cashback' ? (form.category || 'Cashback') : form.category
+      const fixed = FIXED_CATEGORY[type]
+      const category = fixed ?? form.category
       if (!category.trim()) return null
       return {
         data: {
-          description: form.description || (type === 'cashback' ? 'Cashback' : 'Refund'),
+          description: form.description || (type === 'income' ? 'Income' : fixed ?? 'Refund'),
           date: form.date,
           category,
           payment_method: form.payment_method,
@@ -70,10 +94,12 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
           transaction_type: type,
           refund_for_transaction_id: null,
         },
-        newCategoryToAdd: newCategoryMode ? form.category : (type === 'cashback' && !allCategories.includes('Cashback') ? 'Cashback' : null),
+        newCategoryToAdd: newCategoryMode
+          ? { name: form.category, kind: categoryKindFor(type) }
+          : (fixed && !allCategories.includes(fixed) ? { name: fixed, kind: categoryKindFor(type) } : null),
       }
     },
-  }), [form, type, newCategoryMode, allCategories])
+  }), [form, type, newCategoryMode, allCategories, incomeCategories])
 
   function set(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -95,12 +121,13 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
     }
   }
 
-  function handleTypeChange(next: 'refund' | 'cashback') {
+  function handleTypeChange(next: MoneyInType) {
     setType(next)
     setNewCategoryMode(false)
     setForm(prev => ({
       ...prev,
-      category: next === 'cashback' ? 'Cashback' : (allCategories[0] ?? ''),
+      category: FIXED_CATEGORY[next]
+        ?? ((next === 'income' ? incomeCategories : allCategories)[0] ?? ''),
     }))
   }
 
@@ -122,15 +149,15 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
   }
   const typeTabActive: React.CSSProperties = {
     ...typeTabBase,
-    background: type === 'cashback' ? 'rgba(52,199,89,0.15)' : 'var(--surface2)',
-    color: type === 'cashback' ? 'var(--success, #34c759)' : 'var(--text)',
+    background: type === 'refund' ? 'var(--surface2)' : 'rgba(52,199,89,0.15)',
+    color: type === 'refund' ? 'var(--text)' : 'var(--success, #34c759)',
     fontWeight: 600,
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* Refund vs Cashback toggle */}
+      {/* Refund vs Cashback vs Income toggle */}
       <div style={{
         display: 'flex',
         gap: '4px',
@@ -144,6 +171,9 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
         <button style={type === 'cashback' ? typeTabActive : typeTabBase} onClick={() => handleTypeChange('cashback')}>
           Cashback
         </button>
+        <button style={type === 'income' ? typeTabActive : typeTabBase} onClick={() => handleTypeChange('income')}>
+          Income
+        </button>
       </div>
 
       <div>
@@ -152,7 +182,11 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
           style={inputStyle}
           value={form.description}
           onChange={set('description')}
-          placeholder={type === 'cashback' ? 'e.g. card cashback reward' : 'e.g. Return – jacket'}
+          placeholder={
+            type === 'cashback' ? 'e.g. card cashback reward'
+            : type === 'income' ? 'e.g. Paycheck – Acme Corp'
+            : 'e.g. Return – jacket'
+          }
         />
       </div>
 
@@ -166,11 +200,11 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
         <AmountInput value={form.amount} onValueChange={v => setForm(prev => ({ ...prev, amount: v }))} />
       </div>
 
-      {/* Category — free choice for refunds, locked to Cashback for cashbacks */}
+      {/* Category — pinned for cashback, otherwise picked from the tab's vocabulary */}
       <div>
         <label style={labelStyle}>Category</label>
-        {type === 'cashback' ? (
-          <input style={{ ...inputStyle, color: 'var(--muted)' }} value="Cashback" readOnly />
+        {FIXED_CATEGORY[type] ? (
+          <input style={{ ...inputStyle, color: 'var(--muted)' }} value={FIXED_CATEGORY[type]} readOnly />
         ) : newCategoryMode ? (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
@@ -184,7 +218,7 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
               type="button"
               onClick={() => {
                 setNewCategoryMode(false)
-                setForm(prev => ({ ...prev, category: allCategories[0] ?? '' }))
+                setForm(prev => ({ ...prev, category: categoryOptions[0] ?? '' }))
               }}
               style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}
             >
@@ -204,7 +238,7 @@ export function RefundCashbackForm({ ref, allCategories, allMethods, accounts }:
               }
             }}
           >
-            {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+            {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
             <option value="__new__">＋ Add new category…</option>
           </select>
         )}

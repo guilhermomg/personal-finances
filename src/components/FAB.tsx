@@ -5,8 +5,9 @@ import { TransactionModal } from './transactions/TransactionModal'
 import type { Account } from '../types/finance'
 import type { PaymentCard } from './transactions/PaymentForm'
 
-export function FAB({ allCategories, allMethods, allProviders, accounts, creditCards = [] }: {
+export function FAB({ allCategories, incomeCategories, allMethods, allProviders, accounts, creditCards = [] }: {
   allCategories: string[]
+  incomeCategories: string[]
   allMethods: string[]
   allProviders: string[]
   accounts: Account[]
@@ -49,6 +50,7 @@ export function FAB({ allCategories, allMethods, allProviders, accounts, creditC
           allMethods={allMethods}
           allProviders={allProviders}
           accounts={accounts}
+          incomeCategories={incomeCategories}
           creditCards={creditCards}
           onClose={() => setOpen(false)}
         />

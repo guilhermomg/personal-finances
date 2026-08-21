@@ -1,4 +1,4 @@
-import { getDashboardData, getAccounts, getCategories, getProviders, getPaymentMethodStyles } from '../lib/finance'
+import { getDashboardData, getAccounts, getCategories, getIncomeCategories, getProviders, getPaymentMethodStyles } from '../lib/finance'
 import { SpendingCard } from '../components/SpendingCard'
 import { CardSummary } from '../components/CardSummary'
 import { TransactionTable } from '../components/TransactionTable'
@@ -16,10 +16,11 @@ export default async function FinancesPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { month } = await searchParams
-  const [data, accounts, allCategories, allProviders, paymentStyles] = await Promise.all([
+  const [data, accounts, allCategories, incomeCategories, allProviders, paymentStyles] = await Promise.all([
     getDashboardData(month as string | undefined),
     getAccounts(),
     getCategories(),
+    getIncomeCategories(),
     getProviders(),
     getPaymentMethodStyles(),
   ])
@@ -131,6 +132,7 @@ export default async function FinancesPage({
 
       <FAB
         allCategories={allCategories}
+        incomeCategories={incomeCategories}
         allMethods={data.cards.map(c => c.name)}
         allProviders={allProviders}
         accounts={accounts}

@@ -1,9 +1,20 @@
 import { createFinancesAdminClient } from './supabase/admin'
 import { getOrCreatePeriod } from './billing'
-import type { Transaction, TransactionAllocation, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, Account } from '../types/finance'
+import type { CategoryKind, Transaction, TransactionAllocation, DashboardData, CardData, PaymentStyleMap, BillingPeriod, BillingPeriodOption, CumulativePoint, Account } from '../types/finance'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// Does this transaction represent money spent? Income arrives from outside and
+// transfers move money between the user's own accounts — neither is spending,
+// so every budget, category, card and chart figure is computed over spend
+// transactions only. Without this, a paycheck would land as a large negative
+// expense and silently inflate every budget's remaining headroom.
+function isSpend(t: Transaction): boolean {
+  return t.transaction_type !== 'income' && t.transaction_type !== 'transfer'
+}
+
+// Spend direction: expenses add, refunds and cashback subtract. Only meaningful
+// for transactions that pass isSpend() — callers must filter first.
 function txSign(type: string): 1 | -1 {
   return type === 'expense' ? 1 : -1
 }
@@ -146,6 +157,9 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   ])
 
   const txs = await attachAllocations(db, (txsRes.data ?? []) as Transaction[])
+  // Spending activity only. `txs` still holds everything (income included) for
+  // recurring-template matching below, which cares about the row's existence.
+  const spendTxs = txs.filter(isSpend)
   const budgetRows = budgetsRes.data ?? []
 
   // Build payments map: cycleId → total amount paid
@@ -169,21 +183,21 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   const periodStarted = currentPeriod.start_month.slice(0, 7) <= todayStr.slice(0, 7)
   const groceriesOf = (t: Transaction) =>
     txAllocations(t).reduce((s, [cat, amt]) => s + (cat === 'Groceries' ? amt : 0), 0)
-  const groceriesSpent = txs
+  const groceriesSpent = spendTxs
     .filter(t => (periodStarted ? t.date <= todayStr : true))
     .reduce((s, t) => s + groceriesOf(t), 0)
   // Projected groceries — all grocery splits in the period regardless of date.
-  const groceriesProjected = txs.reduce((s, t) => s + groceriesOf(t), 0)
+  const groceriesProjected = spendTxs.reduce((s, t) => s + groceriesOf(t), 0)
 
   // ── per-category budget cards ──────────────────────────────────────────────
   // Spend-to-date per category (mirrors the groceries to-date rule), so every
   // budgeted category — even one with no spending yet — renders its own card.
-  const categorySpentToDate = txs
+  const categorySpentToDate = spendTxs
     .filter(t => (periodStarted ? t.date <= todayStr : true))
     .reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
   // Projected per category — all txs in the period regardless of date, mirroring
   // the projected figure on the Total Expenses / card summaries.
-  const categoryProjected = txs.reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
+  const categoryProjected = spendTxs.reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
   const budgetCards = Object.entries(categoryBudgets)
     .map(([category, ceiling]) => ({
       category,
@@ -196,7 +210,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   // ── cards ─────────────────────────────────────────────────────────────────
   const cards: CardData[] = cyclesData.map((cycle: any) => {
     const { id: accountId, payment_method, credit_limit, account_type } = cycle.account
-    const cycleTxs = txs.filter(t => t.billing_cycle_id === cycle.id)
+    const cycleTxs = spendTxs.filter(t => t.billing_cycle_id === cycle.id)
     const projected = cycleTxs.reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
     const spent = cycleTxs.filter(t => t.date <= todayStr).reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
     return {
@@ -249,7 +263,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   const recurringTotal = recurring.reduce((s, r) => s + r.amount, 0)
 
   // ── installments ──────────────────────────────────────────────────────────
-  const installmentTxs = txs
+  const installmentTxs = spendTxs
     .filter(t => t.installment_number !== null)
     .sort((a, b) => a.date.localeCompare(b.date))
   const installments = installmentTxs.map(t => ({
@@ -263,7 +277,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   const installTotal = installments.reduce((s, r) => s + r.amount, 0)
 
   // ── categories ────────────────────────────────────────────────────────────
-  const categoryMap = txs.reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
+  const categoryMap = spendTxs.reduce<Record<string, number>>((acc, t) => { addAllocations(acc, t); return acc }, {})
   const categories = Object.entries(categoryMap)
     .map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount)
@@ -284,13 +298,13 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   // far. Both sides use the same date<=today basis as the cards' `spent` (0 for a
   // period that hasn't started yet), so future periods read 0 instead of going
   // negative from subtracting the full recurring total off a $0 spend.
-  const recurringActualTotal = txs
+  const recurringActualTotal = spendTxs
     .filter(t => t.recurring_transaction_id !== null && t.date <= todayStr)
     .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
   const discretionarySpent = totalSpent - recurringActualTotal
   // Projected discretionary — full-period spend (incl. scheduled recurring still to post)
   // minus all recurring, so it reflects what will actually be left at period end.
-  const recurringProjectedTotal = txs
+  const recurringProjectedTotal = spendTxs
     .filter(t => t.recurring_transaction_id !== null)
     .reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
   const discretionaryProjected = projectedSpent - recurringProjectedTotal
@@ -316,7 +330,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
 
   let actualAcc = 0, recurringAcc = 0, installmentAcc = 0
   const chartData: CumulativePoint[] = chartDays.map(day => {
-    const dayTxs = txs.filter(t => t.date === day)
+    const dayTxs = spendTxs.filter(t => t.date === day)
     actualAcc      += dayTxs.reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
     recurringAcc   += dayTxs.filter(t => t.recurring_transaction_id !== null).reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
     installmentAcc += dayTxs.filter(t => t.installment_number !== null).reduce((s, t) => s + txSign(t.transaction_type) * Number(t.amount), 0)
@@ -349,14 +363,28 @@ export async function getDashboardData(month?: string): Promise<DashboardData | 
   }
 }
 
-export async function getCategories(): Promise<string[]> {
+async function categoryNames(kind: CategoryKind): Promise<string[]> {
   const db = createFinancesAdminClient()
   const { data } = await db
     .from('categories')
     .select('name')
     .eq('active', true)
+    .eq('kind', kind)
+    // sort_order first so a curated order (Salary before Gift) beats alphabetical;
+    // everything defaults to 100, leaving expense categories alphabetical.
+    .order('sort_order')
     .order('name')
   return (data ?? []).map((c: any) => c.name)
+}
+
+// Expense categories — what budgets, the breakdown and the spend forms use.
+export async function getCategories(): Promise<string[]> {
+  return categoryNames('expense')
+}
+
+// Income categories — Salary, Interest, Gift and anything the user adds.
+export async function getIncomeCategories(): Promise<string[]> {
+  return categoryNames('income')
 }
 
 export async function getAccounts(): Promise<Account[]> {

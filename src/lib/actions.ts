@@ -2,7 +2,7 @@
 
 import { createFinancesAdminClient, ownerUserId } from './supabase/admin'
 import { getOrCreateCycleForTransaction, getOrCreateCycleByStatementDate } from './billing'
-import type { TransactionAllocation } from '../types/finance'
+import type { CategoryKind, TransactionAllocation, TransactionType } from '../types/finance'
 
 type TransactionData = {
   description: string
@@ -12,7 +12,7 @@ type TransactionData = {
   amount: number
   notes: string | null
   statement_date: string | null
-  transaction_type?: 'expense' | 'refund' | 'cashback'
+  transaction_type?: TransactionType
   refund_for_transaction_id?: number | null
   // Per-category splits. Length ≤ 1 → single-category (no allocation rows stored).
   categories?: TransactionAllocation[]
@@ -131,9 +131,9 @@ export async function updateCreditLimit(accountId: number, amount: number | null
   if (error) throw new Error(error.message)
 }
 
-export async function addCategory(name: string) {
+export async function addCategory(name: string, kind: CategoryKind = 'expense') {
   const db = createFinancesAdminClient()
-  const { error } = await db.from('categories').insert({ name, user_id: ownerUserId() })
+  const { error } = await db.from('categories').insert({ name, kind, user_id: ownerUserId() })
   // Ignore unique-constraint errors — category may already exist
   if (error && !error.code.includes('23505')) throw new Error(error.message)
 }

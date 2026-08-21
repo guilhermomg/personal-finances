@@ -1,3 +1,14 @@
+// Every kind of row the transactions table holds. `expense`, `refund` and
+// `cashback` are spending activity; `income` (money arriving from outside) and
+// `transfer` (money moving between the user's own accounts) are not — see
+// isSpend() in lib/finance.ts.
+// Categories are partitioned by kind: expense categories drive budgets and the
+// spending breakdown; income categories (Salary, Interest, Gift…) exist only to
+// classify money arriving, and must never appear in an expense or budget picker.
+export type CategoryKind = 'expense' | 'income'
+
+export type TransactionType = 'expense' | 'refund' | 'cashback' | 'income' | 'transfer'
+
 export type Transaction = {
   id: number
   date: string
@@ -16,7 +27,7 @@ export type Transaction = {
   installment_number: number | null
   installment_total: number | null
   notes: string | null
-  transaction_type: 'expense' | 'refund' | 'cashback'
+  transaction_type: TransactionType
   refund_for_transaction_id: number | null
   // Per-category splits. Present only when a transaction has 2+ categories;
   // single-category transactions rely on `category` + `amount` instead.
@@ -73,7 +84,7 @@ export type TransactionRow = {
   recurring_transaction_id?: number | null
   actual_transaction_id?: number | null
   day_of_month?: number | null
-  transaction_type?: 'expense' | 'refund' | 'cashback'
+  transaction_type?: TransactionType
 }
 
 export type CategoryData = {

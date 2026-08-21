@@ -1,7 +1,7 @@
-import { formatCurrency, formatPct } from '../lib/format'
+import { formatCurrency, formatPct, txDisplaySign, txTypeLabel, txIsCredit } from '../lib/format'
 import { Chip } from './Chip'
 import { chipProps } from './chipUtils'
-import type { TransactionRow, PaymentStyleMap } from '../types/finance'
+import type { TransactionRow, PaymentStyleMap, TransactionType } from '../types/finance'
 
 const creditBadgeStyle: React.CSSProperties = {
   display: 'inline-block',
@@ -17,14 +17,23 @@ const creditBadgeStyle: React.CSSProperties = {
   verticalAlign: 'middle',
 }
 
-function txDisplayAmount(row: TransactionRow) {
-  const type = row.transaction_type ?? 'expense'
-  return type === 'expense' ? row.amount : -row.amount
+const neutralBadgeStyle: React.CSSProperties = {
+  ...creditBadgeStyle,
+  background: 'var(--surface2)',
+  color: 'var(--muted)',
+  border: '1px solid var(--border)',
 }
 
-function CreditBadge({ type }: { type?: string }) {
-  if (!type || type === 'expense') return null
-  return <span style={creditBadgeStyle}>{type === 'cashback' ? 'Cashback' : 'Refund'}</span>
+function txDisplayAmount(row: TransactionRow) {
+  return txDisplaySign(row.transaction_type) * row.amount
+}
+
+function CreditBadge({ type }: { type?: TransactionType }) {
+  const label = txTypeLabel(type)
+  if (!label) return null
+  // Transfers move money out without being spend, so they read neutral rather
+  // than borrowing the green used for money arriving.
+  return <span style={txIsCredit(type) ? creditBadgeStyle : neutralBadgeStyle}>{label}</span>
 }
 
 type Props = {
